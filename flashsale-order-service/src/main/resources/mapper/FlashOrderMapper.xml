@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ye94z.order.mapper.FlashOrderMapper">
+
+    <!-- 字段与实体映射 -->
+    <resultMap id="FlashOrderMap" type="com.ye94z.order.entity.FlashOrder">
+        <id     column="id"                 property="id"/>
+        <result column="user_id"            property="userId"/>
+        <result column="product_id"         property="productId"/>
+        <result column="quantity"           property="quantity"/>
+        <result column="pay_amount_cents"   property="payAmountCents"/>
+        <result column="status"             property="status"/>
+        <result column="pay_channel"        property="payChannel"/>
+        <result column="pay_txn_id"         property="payTxnId"/>
+        <result column="idempotency_key"    property="idempotencyKey"/>
+        <result column="create_time"        property="createTime"/>
+        <result column="pay_time"           property="payTime"/>
+        <result column="fulfill_time"       property="fulfillTime"/>
+        <result column="close_time"         property="closeTime"/>
+        <result column="update_time"        property="updateTime"/>
+    </resultMap>
+
+    <!-- 新增 -->
+    <insert id="insert" parameterType="com.ye94z.order.entity.FlashOrder">
+        INSERT INTO flash_order
+        (id, user_id, product_id, quantity, pay_amount_cents, status, pay_channel, pay_txn_id,
+         idempotency_key, create_time, pay_time, fulfill_time, close_time, update_time)
+        VALUES
+            (#{id}, #{userId}, #{productId}, #{quantity}, #{payAmountCents}, #{status}, #{payChannel}, #{payTxnId},
+             #{idempotencyKey}, #{createTime}, #{payTime}, #{fulfillTime}, #{closeTime}, #{updateTime})
+    </insert>
+
+    <!-- 主键查询 -->
+    <select id="findById" parameterType="long" resultMap="FlashOrderMap">
+        SELECT id, user_id, product_id, quantity, pay_amount_cents, status, pay_channel, pay_txn_id,
+               idempotency_key, create_time, pay_time, fulfill_time, close_time, update_time
+        FROM flash_order
+        WHERE id = #{id}
+    </select>
+
+    <!-- 基于旧状态更新为新状态，并写入对应业务时间（2=PAID, 3=FULFILLED, 4=CANCELED） -->
+    <update id="updateStatusIf">
+        UPDATE flash_order
+        <set>
+            status = #{to},
+            update_time = NOW(),
+            <if test="to == 2">
+                pay_time = #{changeTime},
+            </if>
+            <if test="to == 3">
+                fulfill_time = #{changeTime},
+            </if>
+            <if test="to == 4">
+                close_time = #{changeTime},
+            </if>
+        </set>
+        WHERE id = #{orderId}
+        AND status = #{from}
+    </update>
+    <update id="markPaidIfUnpaid">
+        update flash_order
+        set status = 2,               <!-- PAID -->
+        pay_time = now(),
+        pay_channel = #{payChannel},
+        pay_txn_id = #{txnId},
+        update_time = now()
+        where id = #{orderId}
+        and status = 1              <!-- 仅 UNPAID 可置已支付 -->
+    </update>
+
+</mapper>

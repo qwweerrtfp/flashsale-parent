@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ye94z.product.mapper.FlashProductMapper">
+
+    <!--
+      说明：
+      1) 使用 resultType + 全字段选择，依赖全局 map-underscore-to-camel-case=true 做驼峰映射。
+      2) 若实体字段与列名一一对应（驼峰 <-> 下划线），无需额外 resultMap。
+    -->
+    <select id="findById" resultType="com.ye94z.product.entity.FlashProduct">
+        SELECT
+            id,
+            title,
+            subtitle,
+            images,
+            description,
+            flash_price_cents,
+            origin_price_cents,
+            stock,
+            sold,
+            limit_per_user,
+            start_time,
+            end_time,
+            status,
+            version,
+            create_time,
+            update_time
+        FROM flash_product
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <update id="incrStockDecrSold">
+        UPDATE flash_product
+        SET stock = stock + #{qty},
+            sold = sold - #{qty},
+            update_time = CURRENT_TIMESTAMP
+        WHERE id = #{productId}
+    </update>
+    <update id="decrStockIncrSold">
+        UPDATE flash_product
+        SET stock       = stock - #{qty},
+            sold        = sold + #{qty},
+            update_time = CURRENT_TIMESTAMP
+        WHERE id = #{productId}
+    </update>
+
+</mapper>

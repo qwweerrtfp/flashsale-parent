@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ye94z.payment.mapper.WalletTxnMapper">
+
+    <resultMap id="BaseMap" type="com.ye94z.payment.entity.WalletTxn">
+        <id     column="id"            property="id"/>
+        <result column="user_id"       property="userId"/>
+        <result column="order_id"      property="orderId"/>
+        <result column="amount_cents"  property="amountCents"/>
+        <result column="direction"     property="direction"/>
+        <result column="status"        property="status"/>
+        <result column="biz_type"      property="bizType"/>
+        <result column="channel"       property="channel"/>
+        <result column="idempotency_key" property="idempotencyKey"/>
+        <result column="remark"        property="remark"/>
+        <result column="create_time"   property="createTime"/>
+        <result column="update_time"   property="updateTime"/>
+    </resultMap>
+
+    <select id="findByOrderId" resultMap="BaseMap">
+        select * from pay_wallet_txn
+        where order_id = #{orderId}
+        limit 1
+    </select>
+
+    <insert id="insert" parameterType="com.ye94z.payment.entity.WalletTxn" useGeneratedKeys="true" keyProperty="id">
+        insert into pay_wallet_txn
+        (user_id, order_id, amount_cents, direction, status, biz_type, channel, idempotency_key, remark, create_time, update_time)
+        values
+            (#{userId}, #{orderId}, #{amountCents}, #{direction}, #{status}, #{bizType}, #{channel}, #{idempotencyKey}, #{remark}, now(), now())
+    </insert>
+
+</mapper>

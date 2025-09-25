@@ -1,0 +1,50 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: flashsale-gateway-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        corsConfigurations:
+          "[/**]":
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: false
+      routes:
+        - id: product
+          uri: lb://flashsale-product-service
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+
+        - id: order
+          uri: lb://flashsale-order-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - StripPrefix=1
+
+        - id: payment
+          uri: lb://flashsale-payment-service
+          predicates:
+            - Path=/api/pay/**
+          filters:
+            - StripPrefix=1
+
+# 如果你做基于 JWT 的网关鉴权，这里只放自定义配置，真正校验逻辑写在 GatewayFilter 里
+app:
+  jwt:
+    header: Authorization
+    prefix: ""   # 前端不带 Bearer
+    # 注意：网关不一定需要秘钥，若仅转发则可不配；若在网关校验，就配同一份秘钥
+    secret: "change-me-please-32bytes-min-1234567890abcd"

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ye94z.user.mapper.UserMapper">
+
+    <!-- 根据手机号查用户 -->
+    <select id="getByPhone" resultType="com.ye94z.user.entity.User">
+        SELECT id, phone, password, nickname, avatar, status, create_time, update_time
+        FROM fs_user
+        WHERE phone = #{phone}
+        LIMIT 1
+    </select>
+
+    <!-- 根据ID查用户 -->
+    <select id="getById" resultType="com.ye94z.user.entity.User">
+        SELECT id, phone, password, nickname, avatar, status, create_time, update_time
+        FROM fs_user
+        WHERE id = #{id}
+    </select>
+
+    <!-- 新增用户（主键自增） -->
+    <insert id="save" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO fs_user (phone, password, nickname, avatar, status)
+        VALUES (#{phone}, #{password}, #{nickname}, #{avatar}, #{status})
+    </insert>
+
+</mapper>

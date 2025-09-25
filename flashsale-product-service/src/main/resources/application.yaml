@@ -1,0 +1,32 @@
+server:
+  port: 9020
+
+spring:
+  application:
+    name: flashsale-product-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/fs_product?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: whc7777777
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.worthy.product.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.worthy.product: info

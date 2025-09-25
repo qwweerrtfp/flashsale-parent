@@ -1,0 +1,22 @@
+server:
+  port: 9010
+
+spring:
+  application:
+    name: flashsale-user-service
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/fs_user?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: whc7777777
+
+  data:
+    redis:
+      host: localhost
+      timeout: 2000ms
+      database: 0
+      port: 6379
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/flashsale-common-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-jackson/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-jackson/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-jwt/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-jwt/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-rabbit/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-rabbit/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-redis/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-redis/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-security/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common-security/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-gateway/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-gateway/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-order-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-order-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-payment-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-payment-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-product-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-product-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-user-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/flashsale-user-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
