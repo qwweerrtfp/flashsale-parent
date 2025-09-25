@@ -1,32 +1,22 @@
 package com.ye94z.gateway.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.reactive.error.ErrorAttributes;
+import com.ye94z.common.core.dto.Result;
+import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
+import org.springframework.cloud.gateway.support.NotFoundException;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.server.HandlerStrategies;
-import org.springframework.web.reactive.function.server.ServerRequest;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
-import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
-
 @Component
-@Order(-2)
+@Order(-2) // 优先级高于默认
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
 
-    private final ErrorAttributes errorAttributes;
-    private final ObjectMapper objectMapper;
-
-    public GlobalExceptionHandler(ErrorAttributes errorAttributes, ObjectMapper objectMapper) {
-        this.errorAttributes = errorAttributes;
-        this.objectMapper = objectMapper;
-    }
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
@@ -34,22 +24,35 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             return Mono.error(ex);
         }
 
-        ServerRequest request = ServerRequest.create(
-                exchange, HandlerStrategies.withDefaults().messageReaders());
+        HttpStatus status;
+        String message;
 
-        Map<String, Object> body =
-                errorAttributes.getErrorAttributes(request, ErrorAttributeOptions.defaults());
+        if (ex instanceof NotFoundException) {
+            status = HttpStatus.SERVICE_UNAVAILABLE;
+            message = "Service unavailable";
+        } else if (ex instanceof ResponseStatusException rse) {
+            status = HttpStatus.valueOf(rse.getStatusCode().value());
+            message = rse.getReason() != null ? rse.getReason() : rse.getMessage();
+        } else if (ex instanceof IllegalArgumentException) {
+            status = HttpStatus.BAD_REQUEST;
+            message = ex.getMessage();
+        } else {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+            message = "Internal server error";
+        }
 
-        int status = (int) body.getOrDefault("status", 500);
-        exchange.getResponse().setStatusCode(HttpStatus.valueOf(status));
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        // 关键改动：返回 Result.fail
+        Result<?> result = Result.fail(String.valueOf(status.value()), message);
+
+        var response = exchange.getResponse();
+        response.setStatusCode(status);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         try {
-            byte[] bytes = objectMapper.writeValueAsBytes(body);
-            return exchange.getResponse()
-                    .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(bytes)));
-        } catch (Exception writeEx) {
-            return Mono.error(writeEx);
+            byte[] bytes = mapper.writeValueAsBytes(result);
+            return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
+        } catch (Exception e) {
+            return Mono.error(e);
         }
     }
 }

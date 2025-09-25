@@ -44,7 +44,7 @@ public class UserServiceImpl implements UserService {
                 RedisConstants.LOGIN_CODE_TTL, TimeUnit.MINUTES);
         // 4) 实际项目应调用短信通道；这里仅打印日志
         log.info("[SMS] phone={}, code={}", phone, code);
-        return Result.ok();
+        return Result.ok(code);
     }
 
     @Override

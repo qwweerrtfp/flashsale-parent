@@ -20,6 +20,12 @@ spring:
             allowedHeaders: "*"
             allowCredentials: false
       routes:
+        - id: user
+          uri: lb://flashsale-user-service
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=1
         - id: product
           uri: lb://flashsale-product-service
           predicates:
@@ -40,11 +46,3 @@ spring:
             - Path=/api/pay/**
           filters:
             - StripPrefix=1
-
-# 如果你做基于 JWT 的网关鉴权，这里只放自定义配置，真正校验逻辑写在 GatewayFilter 里
-app:
-  jwt:
-    header: Authorization
-    prefix: ""   # 前端不带 Bearer
-    # 注意：网关不一定需要秘钥，若仅转发则可不配；若在网关校验，就配同一份秘钥
-    secret: "change-me-please-32bytes-min-1234567890abcd"

@@ -24,7 +24,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     // 最小白名单（按你项目接口调整）
     private static final Set<String> WHITE_LIST = Set.of(
             "/api/user/login",
-            "/api/user/code",
+            "/api/user/send-code",
             "/actuator/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",

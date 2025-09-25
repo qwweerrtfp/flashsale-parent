@@ -8,7 +8,7 @@ import com.ye94z.common.core.dto.Result;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/user")
 public class UserAuthController {
 
     private final UserService userService;
@@ -20,6 +20,7 @@ public class UserAuthController {
     /** 发送短信验证码（仅测试日志） */
     @PostMapping("/send-code")
     public Result sendCode(@RequestParam("phone") String phone) {
+        if(phone.isBlank()) return Result.fail("手机号不能为空");
         return userService.sendCode(phone);
     }
 
