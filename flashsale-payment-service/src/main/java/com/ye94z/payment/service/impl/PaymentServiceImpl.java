@@ -73,12 +73,18 @@ public class PaymentServiceImpl implements PaymentService {
                 .setBizType(BIZ_PAY_ORDER)
                 .setChannel(CH_BALANCE)
                 .setRemark("balance pay success");
+
         try {
-            txnMapper.insert(txn);
-        } catch (DuplicateKeyException e) {
-            // 若唯一键为 order_id，则说明并发重复；按成功处理
-            WalletTxn again = txnMapper.findByOrderId(orderId);
-            if (again != null) txn = again;
+            txnMapper.insert(txn); // 唯一键: order_id
+        } catch (DuplicateKeyException dup) {
+            // 幂等：已经有这笔订单的流水
+            WalletTxn existed = txnMapper.findByOrderId(orderId);
+            if (existed != null && existed.getStatus() == ST_SUCCESS) {
+                // 不再发布事件（很可能已发布过）；直接返回成功与原txnId
+                return Result.ok(existed.getId());
+            }
+            // 如果查到是 INIT/FAILED 等中间态，你可以返回“处理中/失败”，由上层决定是否重试
+            return Result.fail("支付处理中或已被处理，请稍后查询状态");
         }
 
         final Long txnId = txn.getId();

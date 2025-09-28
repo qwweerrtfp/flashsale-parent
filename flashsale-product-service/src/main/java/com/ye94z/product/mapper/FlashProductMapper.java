@@ -14,4 +14,7 @@ public interface FlashProductMapper {
     int incrStockDecrSold(@Param("productId") Long productId, @Param("qty") Integer qty);
 
     int decrStockIncrSold(Long productId, Integer quantity);
+
+    /** 上架秒杀商品 */
+    int onSale(Long productId);
 }

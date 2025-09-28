@@ -26,6 +26,7 @@ spring:
             - Path=/api/user/**
           filters:
             - StripPrefix=1
+
         - id: product
           uri: lb://flashsale-product-service
           predicates:

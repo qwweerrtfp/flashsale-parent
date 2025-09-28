@@ -12,6 +12,7 @@ import com.ye94z.order.mq.msg.CancelOrderMessage;
 import com.ye94z.order.mq.msg.PayOrderMessage;
 import com.ye94z.order.mq.msg.PlaceOrderMessage;
 import com.ye94z.order.mq.msg.TimeoutOrderMessage;
+import com.ye94z.order.sse.SseHub;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -68,9 +69,9 @@ public class OrderCommandConsumer {
             order.setQuantity(msg.getQuantity());
             order.setPayAmountCents(amount);
             order.setStatus((byte) STATUS_UNPAID);
-            order.setCreateTime(LocalDateTime.now());
 
             orderMapper.insert(order);
+            channel.basicAck(tag, false);
             log.info("[Create] order inserted: {}", order.getId());
 
             // 注：超时关单的延时消息已在下单入口发出，这里不重复发
@@ -132,7 +133,12 @@ public class OrderCommandConsumer {
     public void onPay(PayOrderMessage msg) {
         try {
             log.info("[Pay] received pay command, orderId={}", msg.getOrderId());
-            paymentApi.pay(msg.getUserId(), msg.getOrderId(), msg.getPayAmountCents());
+            Result<Long> ret = paymentApi.pay(msg.getUserId(), msg.getOrderId(), msg.getPayAmountCents());
+            if (ret.isSuccess()) {
+                log.info("[Pay] pay success: txnId={}", ret.getData());
+            } else {
+                log.warn("[Pay] pay failed: {}", ret.getErrorMsg());
+            }
         } catch (Exception e) {
             log.error("[Pay] error, msg={}", msg, e);
         }
@@ -159,6 +165,8 @@ public class OrderCommandConsumer {
         } catch (Exception e) {
             int retries = getRetryCount(xDeath);
             if (retries >= 2) {
+                channel.basicAck(tag, false);
+                log.error("[Timeout] error, finally, msg={}", msg, e);
                 rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
             }else{
                 channel.basicReject(tag, false);

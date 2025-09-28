@@ -12,4 +12,8 @@ public final class CacheKeys {
 
     /** 商品详情 重建互斥锁 前缀：lock:product:{id} */
     public static final String LOCK_PRODUCT_KEY  = "lock:product:";
+
+    /** Redis 实时库存与用户累计的 key 前缀（Lua 里也用这两个） */
+    public static final String STOCK_PREFIX   = "flash:stock:"; // String -> INCRBY/DECRBY
+    public static final String USER_BUY_HASH  = "flash:buy:";   // Hash    -> HINCRBY field=userId
 }

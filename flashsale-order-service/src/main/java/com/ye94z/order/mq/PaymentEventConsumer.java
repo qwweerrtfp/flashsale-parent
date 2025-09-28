@@ -4,6 +4,7 @@ import com.rabbitmq.client.Channel;
 import com.ye94z.order.event.PaymentPaidEvent;
 import com.ye94z.order.mapper.FlashOrderMapper;
 import com.ye94z.order.mq.config.OrderMqConfig;
+import com.ye94z.order.sse.SseHub;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -29,6 +30,7 @@ public class PaymentEventConsumer {
 
     private final FlashOrderMapper orderMapper;
     private final RabbitTemplate rabbitTemplate;
+    //private final SseHub hub;
 
     @RabbitListener(queues = Q_ORDER_PAYMENT_PAID)
     public void onPaid(PaymentPaidEvent evt, Message  message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
@@ -44,6 +46,7 @@ public class PaymentEventConsumer {
         } catch (Exception e) {
             int retries = OrderCommandConsumer.getRetryCount(xDeath);
             if (retries >= 2) {
+                log.error("[Order] handle payment paid event error - finally, evt={}", evt, e);
                 rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
             } else {
                 channel.basicReject(tag, false);

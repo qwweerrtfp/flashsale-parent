@@ -3,27 +3,28 @@ package com.ye94z.order.controller;
 import com.ye94z.common.core.dto.Result;
 import com.ye94z.order.entity.CreateOrderRequest;
 import com.ye94z.order.service.OrderService;
+import com.ye94z.order.sse.SseHub;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * 命令接口：创建/取消/支付
  * - 仅做参数接收 & 调用 service；业务在 OrderServiceImpl
  */
 @RestController
-@RequestMapping(value = "/api/orders", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = "/orders", produces = MediaType.APPLICATION_JSON_VALUE)
 @Validated
+@AllArgsConstructor
 public class OrderCommandController {
 
     private final OrderService orderService;
-
-    public OrderCommandController(OrderService orderService) {
-        this.orderService = orderService;
-    }
+    //private final SseHub hub;
 
     /**
      * 下单（异步）：快速返回订单号
@@ -53,4 +54,11 @@ public class OrderCommandController {
                       @PathVariable("orderId") @NotNull @Min(1) Long orderId) {
         return orderService.requestPay(userId, orderId);
     }
+
+//    @GetMapping(value = "/{orderId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+//    public SseEmitter events(@PathVariable Long orderId) {
+//        SseEmitter emitter = hub.subscribe(orderId, 0L); // 0=永不超时(由网关/容器限制)
+//        try { emitter.send(SseEmitter.event().name("SUBSCRIBED").data(orderId)); } catch (Exception ignore) {}
+//        return emitter;
+//    }
 }

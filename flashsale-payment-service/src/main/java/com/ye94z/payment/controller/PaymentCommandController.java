@@ -22,14 +22,9 @@ public class PaymentCommandController {
     private final PaymentService paymentService;
 
     @PostMapping("/pay")
-    public Result<Long> pay(@Validated @RequestBody PayRequest req) {
-        return paymentService.payOrder(req.getUserId(), req.getOrderId(), req.getAmountCents());
-    }
-
-    @Data
-    public static class PayRequest {
-        @NotNull private Long userId;
-        @NotNull private Long orderId;
-        @NotNull @Min(1) private Long amountCents;
+    public Result<Long> pay(@RequestParam("userId") Long userId,
+                            @RequestParam("orderId") Long orderId,
+                            @RequestParam("amountCents") Long amountCents) {
+        return paymentService.payOrder(userId, orderId, amountCents);
     }
 }

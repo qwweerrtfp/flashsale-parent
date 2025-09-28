@@ -1,0 +1,8 @@
+FROM rabbitmq:3.13-management
+
+# 安装 curl，然后下载并启用延时队列插件
+RUN set -eux; \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*; \
+    curl -sSL -o /opt/rabbitmq/plugins/rabbitmq_delayed_message_exchange-3.13.0.ez \
+      https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.13.0/rabbitmq_delayed_message_exchange-3.13.0.ez; \
+    rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange

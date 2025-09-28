@@ -1,6 +1,14 @@
 package com.ye94z.order.mq.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,6 +20,7 @@ import java.util.Map;
  * 重试次数>=2 后由消费者转发到统一 DLT。
  */
 @Configuration
+@Slf4j
 public class OrderMqConfig {
 
     /* === 你已有的定义，保持不变 === */
@@ -129,5 +138,49 @@ public class OrderMqConfig {
     }
     @Bean public Binding bindTimeoutRetry(DirectExchange globalDlx, Queue qOrderTimeoutRetry) {
         return BindingBuilder.bind(qOrderTimeoutRetry).to(globalDlx).with(RK_RETRY);
+    }
+
+    /** 1) 使用你全局的 ObjectMapper：Long→String、日期格式等策略会生效 */
+    @Bean
+    public MessageConverter messageConverter(ObjectMapper objectMapper) {
+        // 如需跨服务反序列化外部包模型，可放开受信包（生产建议精确到前缀）
+        return new Jackson2JsonMessageConverter(objectMapper);
+    }
+
+    /** 2) RabbitTemplate 走同一个 JSON Converter，并开启 Confirm/Return 便于排障 */
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory cf, MessageConverter mc) {
+        RabbitTemplate t = new RabbitTemplate(cf);
+        t.setMessageConverter(mc);
+        t.setMandatory(true); // unroutable 时触发 Return 回调
+
+        t.setConfirmCallback((corr, ack, cause) -> {
+            String id = corr != null ? corr.getId() : null;
+            if (ack) {
+                log.debug("Confirm OK, id={}", id);
+            } else {
+                log.error("Confirm NACK, id={}, cause={}", id, cause);
+            }
+        });
+
+        t.setReturnsCallback(ret -> {
+            String msgId = ret.getMessage().getMessageProperties().getMessageId();
+            log.error("Return: msgId={}, code={}, text={}, ex={}, rk={}",
+                    msgId, ret.getReplyCode(), ret.getReplyText(), ret.getExchange(), ret.getRoutingKey());
+        });
+        return t;
+    }
+
+    /** 3) 监听容器也用同一个 JSON Converter（关键！） */
+    @Bean
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            ConnectionFactory cf,
+            MessageConverter mc) {
+        SimpleRabbitListenerContainerFactory f = new SimpleRabbitListenerContainerFactory();
+        configurer.configure(f, cf);
+        f.setMessageConverter(mc);
+        // f.setDefaultRequeueRejected(false); // 视重试/DLX策略需要
+        return f;
     }
 }

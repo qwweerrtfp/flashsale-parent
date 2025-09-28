@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
-    private final ProductApiClient productApi;
+    private final ProductApiClient productApiClient;
     private final OrderCommandProducer producer;
 
     // 简单雪花：可后续抽到单例或注入
@@ -38,7 +38,7 @@ public class OrderServiceImpl implements OrderService {
         int qty = (req.getQuantity() == null || req.getQuantity() <= 0) ? 1 : req.getQuantity();
 
         // 1) 调用 product-service 的“闸口”校验（Lua 内部：库存、用户累计购买数<=限购、扣库存&累计）
-        Result<Boolean> gate = productApi.gatePurchase(req.getProductId(), userId, qty);
+        Result<Boolean> gate = productApiClient.gatePurchase(req.getProductId(), userId, qty);
         if (gate == null || !gate.isSuccess() || Boolean.FALSE.equals(gate.getData())) {
             String msg = (gate != null && gate.getErrorMsg() != null) ? gate.getErrorMsg() : "不满足购买条件";
             return Result.fail(msg);

@@ -26,10 +26,10 @@
     <insert id="insert" parameterType="com.ye94z.order.entity.FlashOrder">
         INSERT INTO flash_order
         (id, user_id, product_id, quantity, pay_amount_cents, status, pay_channel, pay_txn_id,
-         idempotency_key, create_time, pay_time, fulfill_time, close_time, update_time)
+         idempotency_key, pay_time, fulfill_time, close_time)
         VALUES
             (#{id}, #{userId}, #{productId}, #{quantity}, #{payAmountCents}, #{status}, #{payChannel}, #{payTxnId},
-             #{idempotencyKey}, #{createTime}, #{payTime}, #{fulfillTime}, #{closeTime}, #{updateTime})
+             #{idempotencyKey}, #{payTime}, #{fulfillTime}, #{closeTime})
     </insert>
 
     <!-- 主键查询 -->

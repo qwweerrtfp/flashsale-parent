@@ -1,0 +1,99 @@
+# 文件名：docker-compose.yml
+name: flashsale
+
+services:
+  mysql:
+    image: mysql:8.4              # 8.4 为 LTS，原生支持 Apple Silicon
+    container_name: mysql8
+    command: [
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_unicode_ci",
+      "--max_connections=300" # 需要兼容老客户端时再开启（8.4 默认已支持 caching_sha2）：# "--authentication-policy=mysql_native_password,caching_sha2_password"
+    ]
+    environment:
+      MYSQL_ROOT_PASSWORD: whc7777777            # ✅ 必改：你的 root 密码
+      TZ: Asia/Shanghai                      # 可改：时区（Asia/Singapore 亦可）
+    ports:
+      - "3306:3306"                          # 可改：宿主机端口占用时调整左边
+    volumes:
+      - mysql_data:/var/lib/mysql            # 数据持久化
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7
+    container_name: redis7
+    command: ["redis-server", "--appendonly", "yes"]   # 开启 AOF 持久化
+    ports:
+      - "6379:6379"                         # 可改
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest         # ✅ 必改：管理台用户名
+      RABBITMQ_DEFAULT_PASS: guest       # ✅ 必改：管理台密码
+      TZ: Asia/Shanghai
+    ports:
+      - "5672:5672"     # AMQP 端口（应用连接）
+      - "15672:15672"   # Web 管理台端口
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    build:
+      context: .
+      dockerfile: Dockerfile.rabbitmq
+
+  nacos:
+    image: nacos/nacos-server:v2.5.1-slim    # ✅ 建议用 slim，多架构、Mac 友好
+    container_name: nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"             # 可改：开发期可关；要鉴权就改为 "true"
+      JVM_XMS: "256m"                        # 可按机器调：512m/1g
+      JVM_XMX: "512m"
+      JVM_XMN: "128m"
+      TZ: Asia/Shanghai
+      # === 如需把 Nacos 元数据持久化到上面的 MySQL（而非内置 Derby），打开下列配置 ===
+      # SPRING_DATASOURCE_PLATFORM: "mysql"
+      # MYSQL_SERVICE_HOST: "mysql"
+      # MYSQL_SERVICE_PORT: "3306"
+      # MYSQL_SERVICE_DB_NAME: "nacos_config"
+      # MYSQL_SERVICE_USER: "root"
+      # MYSQL_SERVICE_PASSWORD: "123456"     # 与上面 MySQL root 密码一致或新建专用用户
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # Nacos 启动较慢，用首页 200 作健康探针即可
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8848/nacos/"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:

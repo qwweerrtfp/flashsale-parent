@@ -1,5 +1,6 @@
 package com.ye94z.product.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.ye94z.common.core.dto.ProductDTO;
 import com.ye94z.common.core.dto.Result;
 import com.ye94z.product.service.ProductService;
@@ -14,10 +15,10 @@ import org.springframework.web.bind.annotation.*;
  * - POST /api/products/stock/restore?productId=&quantity=
  */
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/products")
 @RequiredArgsConstructor
 @Validated
-public class ProductQueryController {
+public class ProductController {
 
     private final ProductService productService;
 
@@ -25,7 +26,7 @@ public class ProductQueryController {
      * 闸口校验（Lua 原子：库存、每人限购累计、原子扣减）
      */
     @PostMapping("/gate-purchase")
-    public Result<Boolean> gatePurchase(@RequestParam("productId") Long productId,
+    public Result<Void> gatePurchase(@RequestParam("productId") Long productId,
                                         @RequestParam("userId") Long userId,
                                         @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
         return productService.gatePurchase(productId, userId, quantity);
@@ -47,5 +48,13 @@ public class ProductQueryController {
                                      @RequestParam("quantity") Integer quantity,
                                      @RequestParam("userId") Long userId) {
         return productService.restoreStock(productId, quantity, userId);
+    }
+
+    /**
+     * 上架秒杀商品（包含 redis 库存预热）
+     */
+    @PostMapping("/on-sale/{id}")
+    public Result<Void> onSale(@PathVariable("id") Long id) {
+        return productService.onSale(id);
     }
 }

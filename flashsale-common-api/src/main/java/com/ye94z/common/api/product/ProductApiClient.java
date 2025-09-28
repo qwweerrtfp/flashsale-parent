@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @FeignClient(
         name = "flashsale-product-service",
         contextId = "productApiClient",
-        path = "/api/products"
+        path = "/products"
 )
 public interface ProductApiClient {
 

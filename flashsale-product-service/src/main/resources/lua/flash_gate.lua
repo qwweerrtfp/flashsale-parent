@@ -6,7 +6,7 @@ local qty   = tonumber(ARGV[3])
 local limit = tonumber(ARGV[4]) or 999999
 
 local stockKey = 'flash:stock:' .. pid          -- String: 剩余库存
-local buyKey   = 'flash:buycnt:' .. pid         -- Hash:   uid -> 用户累计购买数
+local buyKey   = 'flash:buy:' .. pid         -- Hash:   uid -> 用户累计购买数
 
 -- 1) 校验库存是否足够
 local stock = tonumber(redis.call('GET', stockKey) or '0')

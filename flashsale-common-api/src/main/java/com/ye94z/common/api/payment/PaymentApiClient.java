@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
  * 钱包支付契约（仅余额通道）：
  * - 为避免在 API 模块新增 DTO，这里先用请求参数的形式；若你在 core 定义了 PayRequestDTO/PayResultDTO，可改成 @RequestBody。
  */
-@FeignClient(name = "flashsale-payment-service", contextId = "paymentApiClient", path = "/api/payments/wallet")
+@FeignClient(name = "flashsale-payment-service", contextId = "paymentApiClient", path = "/internal/payments")
 public interface PaymentApiClient {
 
     /**

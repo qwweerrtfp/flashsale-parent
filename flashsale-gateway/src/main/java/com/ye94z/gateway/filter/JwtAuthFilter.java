@@ -62,11 +62,13 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         // 透传到下游（用自定义请求头，避免被网关或下游框架屏蔽）
         ServerWebExchange mutated = exchange.mutate()
                 .request(r -> r.headers(h -> {
+                    h.remove("X-User-Id");
+                    h.remove("X-User-Nick");
+                    h.remove("X-User-Icon");
+                    // 之后再由网关注入
                     if (userId != null) h.set("X-User-Id", String.valueOf(userId));
                     if (StringUtils.hasText(nickName)) h.set("X-User-Nick", nickName);
                     if (StringUtils.hasText(icon)) h.set("X-User-Icon", icon);
-                    // 同时也可以把原始 Authorization 透传下去（下游如果也要用到的话）
-                    h.set(HttpHeaders.AUTHORIZATION, auth);
                 }))
                 .build();
 
