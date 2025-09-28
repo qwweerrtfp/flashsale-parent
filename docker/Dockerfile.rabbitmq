@@ -1,8 +1,12 @@
-FROM rabbitmq:3.13-management
+# 文件名：Dockerfile.rabbitmq
+FROM public.ecr.aws/docker/library/rabbitmq:3.13-management
 
-# 安装 curl，然后下载并启用延时队列插件
-RUN set -eux; \
-    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*; \
-    curl -sSL -o /opt/rabbitmq/plugins/rabbitmq_delayed_message_exchange-3.13.0.ez \
-      https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.13.0/rabbitmq_delayed_message_exchange-3.13.0.ez; \
-    rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange
+# 下载并放入官方插件目录
+# 注意：保持版本与基础镜像的大版本(3.13)一致
+ADD https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.13.0/rabbitmq_delayed_message_exchange-3.13.0.ez /opt/rabbitmq/plugins/
+
+# 启用插件（同时保留 management）
+RUN rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange
+
+# 可选：显示已启用插件（构建日志里能看到）
+RUN rabbitmq-plugins list
