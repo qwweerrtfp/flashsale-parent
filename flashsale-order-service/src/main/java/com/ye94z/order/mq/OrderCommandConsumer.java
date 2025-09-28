@@ -79,7 +79,7 @@ public class OrderCommandConsumer {
         } catch (DuplicateKeyException e) {
             // 幂等命中（重复消息 / 同人同品唯一约束）
             channel.basicAck(tag, false);
-            log.info("[Create] dup key, ignore. msg={}", msg);
+            log.info("[Create] duplicate key, ignore. msg={}", msg);
         } catch (Exception e) {
             int retries = getRetryCount(xDeath); // 已经走过 DLX 的次数
             if (retries >= 2) {
@@ -130,16 +130,26 @@ public class OrderCommandConsumer {
      * 发起支付（异步占位，真正扣款由 payment-service 完成）
      */
     @RabbitListener(queues = Q_ORDER_PAY)
-    public void onPay(PayOrderMessage msg) {
+    public void onPay(PayOrderMessage msg, Message message, Channel channel,@Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
+        long tag = message.getMessageProperties().getDeliveryTag();
         try {
             log.info("[Pay] received pay command, orderId={}", msg.getOrderId());
             Result<Long> ret = paymentApi.pay(msg.getUserId(), msg.getOrderId(), msg.getPayAmountCents());
             if (ret.isSuccess()) {
+                channel.basicAck(tag, false);
                 log.info("[Pay] pay success: txnId={}", ret.getData());
             } else {
+                channel.basicAck(tag, false);
                 log.warn("[Pay] pay failed: {}", ret.getErrorMsg());
             }
         } catch (Exception e) {
+            int retries = getRetryCount(xDeath);
+            if (retries >= 2) {
+                rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
+                channel.basicAck(tag, false);
+            } else {
+                channel.basicReject(tag, false);
+            }
             log.error("[Pay] error, msg={}", msg, e);
         }
     }

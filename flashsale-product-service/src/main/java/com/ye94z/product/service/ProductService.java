@@ -20,5 +20,5 @@ public interface ProductService {
     /** 回补库存（取消/超时关单） */
     Result<Void> restoreStock(Long productId, Integer quantity, Long userId);
 
-    Result<Void> onSale(Long id);
+    Result update(ProductDTO productDTO);
 }

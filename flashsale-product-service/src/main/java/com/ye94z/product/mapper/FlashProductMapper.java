@@ -1,5 +1,6 @@
 package com.ye94z.product.mapper;
 
+import com.ye94z.common.core.dto.ProductDTO;
 import com.ye94z.product.entity.FlashProduct;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -17,4 +18,6 @@ public interface FlashProductMapper {
 
     /** 上架秒杀商品 */
     int onSale(Long productId);
+
+    int update(ProductDTO productDTO);
 }

@@ -159,28 +159,43 @@ public class ProductServiceImpl implements ProductService {
         return Result.ok();
     }
 
+//    @Override
+//    @Transactional
+//    public Result<Void> onSale(Long id) {
+//        FlashProduct p = productMapper.findById(id);
+//        if (p == null) return Result.fail("商品不存在");
+//        Integer stock = p.getStock();
+//        if (stock == null || stock <= 0) return Result.fail("库存不足");
+//
+//        // 避免重复上架
+//        int i = productMapper.onSale(id);
+//        if (i <= 0) return Result.fail("上架失败或已上架");
+//
+//        cacheClient.refreshAfterCommit(
+//                CACHE_PRODUCT_KEY + id,
+//                () -> productMapper.findById(id),
+//                30, TimeUnit.MINUTES
+//        );
+//        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+//            @Override public void afterCommit() {
+//                stringRedisTemplate.opsForValue().setIfAbsent(STOCK_PREFIX + id, String.valueOf(stock));
+//            }
+//        });
+//        return Result.ok();
+//    }
+
     @Override
-    @Transactional
-    public Result<Void> onSale(Long id) {
-        FlashProduct p = productMapper.findById(id);
-        if (p == null) return Result.fail("商品不存在");
-        Integer stock = p.getStock();
-        if (stock == null || stock <= 0) return Result.fail("库存不足");
-
-        // 避免重复上架
-        int i = productMapper.onSale(id);
-        if (i <= 0) return Result.fail("上架失败或已上架");
-
+    public Result update(ProductDTO productDTO) {
+        if (productDTO == null || productDTO.getId() == null) {
+            return Result.fail("参数错误");
+        }
+        int i = productMapper.update(productDTO);
+        if(i == 0) return Result.fail("更新失败");
         cacheClient.refreshAfterCommit(
-                CACHE_PRODUCT_KEY + id,
-                () -> productMapper.findById(id),
+                CACHE_PRODUCT_KEY + productDTO.getId(),
+                () -> productMapper.findById(productDTO.getId()),
                 30, TimeUnit.MINUTES
         );
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() {
-                stringRedisTemplate.opsForValue().setIfAbsent(STOCK_PREFIX + id, String.valueOf(stock));
-            }
-        });
         return Result.ok();
     }
 

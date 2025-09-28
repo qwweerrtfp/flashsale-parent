@@ -51,5 +51,26 @@
             update_time = CURRENT_TIMESTAMP
         WHERE id = #{productId}
     </update>
+    <update id="update">
+            update flash_product
+            <set>
+                <if test="title != null">title = #{title},</if>
+                <if test="subtitle != null">subtitle = #{subtitle},</if>
+                <if test="images != null">images = #{images},</if>
+                <if test="description != null">description = #{description},</if>
+                <if test="flashPriceCents != null">flash_price_cents = #{flashPriceCents},</if>
+                <if test="originPriceCents != null">origin_price_cents = #{originPriceCents},</if>
+                <if test="stock != null">stock = #{stock},</if>
+                <if test="sold != null">sold = #{sold},</if>
+                <if test="limitPerUser != null">limit_per_user = #{limitPerUser},</if>
+                <if test="startTime != null">start_time = #{startTime},</if>
+                <if test="endTime != null">end_time = #{endTime},</if>
+                <if test="status != null">status = #{status},</if>
+                version = version + 1,
+                update_time = CURRENT_TIMESTAMP
+            </set>
+            WHERE id = #{id}
+    </update>
+
 
 </mapper>

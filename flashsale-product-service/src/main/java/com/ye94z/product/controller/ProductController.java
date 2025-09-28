@@ -5,6 +5,7 @@ import com.ye94z.common.core.dto.ProductDTO;
 import com.ye94z.common.core.dto.Result;
 import com.ye94z.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
  * - GET  /api/products/{id}
  * - POST /api/products/stock/restore?productId=&quantity=
  */
+@Slf4j
 @RestController
 @RequestMapping("/products")
 @RequiredArgsConstructor
@@ -27,8 +29,9 @@ public class ProductController {
      */
     @PostMapping("/gate-purchase")
     public Result<Void> gatePurchase(@RequestParam("productId") Long productId,
-                                        @RequestParam("userId") Long userId,
-                                        @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
+                                     @RequestHeader(name = "X-User-Id") Long userId,
+                                     @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
+        log.info("[gatePurchase] productId: {}, userId: {}, quantity: {}", productId, userId, quantity);
         return productService.gatePurchase(productId, userId, quantity);
     }
 
@@ -53,8 +56,8 @@ public class ProductController {
     /**
      * 上架秒杀商品（包含 redis 库存预热）
      */
-    @PostMapping("/on-sale/{id}")
-    public Result<Void> onSale(@PathVariable("id") Long id) {
-        return productService.onSale(id);
+    @PostMapping("/update")
+    public Result update(@RequestBody ProductDTO productDTO) {
+        return productService.update(productDTO);
     }
 }
