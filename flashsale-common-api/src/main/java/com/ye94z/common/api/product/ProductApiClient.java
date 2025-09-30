@@ -28,10 +28,4 @@ public interface ProductApiClient {
     /** 商品详情（用于确认秒杀价等关键信息） */
     @GetMapping("/{id}")
     Result<ProductDTO> getProduct(@PathVariable("id") Long productId);
-
-    /** 回补库存（取消/超时关单时调用） */
-    @PostMapping("/stock/restore")
-    Result<Void> restoreStock(@RequestParam("productId") Long productId,
-                              @RequestParam("quantity") Integer quantity,
-                              @RequestParam("userId") Long userId);
 }

@@ -95,7 +95,7 @@ public class OrderMqConfig {
     // 对应重试队列：5s 后回 EX_ORDER_CMD + RK_ORDER_CREATE
     public static final String Q_ORDER_CREATE_RETRY = Q_ORDER_CREATE + ".retry";
     @Bean public Queue qOrderCreateRetry() {
-        return retryQueue(Q_ORDER_CREATE_RETRY, EX_ORDER_CMD, RK_ORDER_CREATE, 5000);
+        return retryQueue(Q_ORDER_CREATE_RETRY, EX_ORDER_CMD, RK_ORDER_CREATE, 300);
     }
     @Bean public Binding bindCreateRetry(DirectExchange globalDlx, Queue qOrderCreateRetry) {
         return BindingBuilder.bind(qOrderCreateRetry).to(globalDlx).with(RK_RETRY);
@@ -108,7 +108,7 @@ public class OrderMqConfig {
     }
     public static final String Q_ORDER_CANCEL_RETRY = Q_ORDER_CANCEL + ".retry";
     @Bean public Queue qOrderCancelRetry() {
-        return retryQueue(Q_ORDER_CANCEL_RETRY, EX_ORDER_CMD, RK_ORDER_CANCEL, 5000);
+        return retryQueue(Q_ORDER_CANCEL_RETRY, EX_ORDER_CMD, RK_ORDER_CANCEL, 300);
     }
     @Bean public Binding bindCancelRetry(DirectExchange globalDlx, Queue qOrderCancelRetry) {
         return BindingBuilder.bind(qOrderCancelRetry).to(globalDlx).with(RK_RETRY);
@@ -121,7 +121,7 @@ public class OrderMqConfig {
     }
     public static final String Q_ORDER_PAY_RETRY = Q_ORDER_PAY + ".retry";
     @Bean public Queue qOrderPayRetry() {
-        return retryQueue(Q_ORDER_PAY_RETRY, EX_ORDER_CMD, RK_ORDER_PAY, 5000);
+        return retryQueue(Q_ORDER_PAY_RETRY, EX_ORDER_CMD, RK_ORDER_PAY, 300);
     }
     @Bean public Binding bindPayRetry(DirectExchange globalDlx, Queue qOrderPayRetry) {
         return BindingBuilder.bind(qOrderPayRetry).to(globalDlx).with(RK_RETRY);
@@ -134,7 +134,7 @@ public class OrderMqConfig {
     }
     public static final String Q_ORDER_TIMEOUT_RETRY = Q_ORDER_TIMEOUT + ".retry";
     @Bean public Queue qOrderTimeoutRetry() {
-        return retryQueue(Q_ORDER_TIMEOUT_RETRY, EX_ORDER_DELAY, RK_ORDER_TIMEOUT, 5000);
+        return retryQueue(Q_ORDER_TIMEOUT_RETRY, EX_ORDER_DELAY, RK_ORDER_TIMEOUT, 300);
     }
     @Bean public Binding bindTimeoutRetry(DirectExchange globalDlx, Queue qOrderTimeoutRetry) {
         return BindingBuilder.bind(qOrderTimeoutRetry).to(globalDlx).with(RK_RETRY);

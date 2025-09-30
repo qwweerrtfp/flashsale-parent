@@ -13,12 +13,7 @@ public interface ProductService {
     /** 获取商品详情（给下单侧确认价格/限购等） */
     Result<ProductDTO> getProduct(Long id);
 
-    /** 扣减库存-DB */
-    @Transactional(rollbackFor = Exception.class)
-    Result<Void> deductStock(Long productId, Integer quantity);
+    Result<Void> update(ProductDTO productDTO);
 
-    /** 回补库存（取消/超时关单） */
-    Result<Void> restoreStock(Long productId, Integer quantity, Long userId);
-
-    Result update(ProductDTO productDTO);
+    Result<Void> onSale(Long id);
 }

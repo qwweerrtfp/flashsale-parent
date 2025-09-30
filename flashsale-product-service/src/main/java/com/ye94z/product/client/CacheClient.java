@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 import com.ye94z.common.core.constants.RedisConstants;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -26,6 +27,7 @@ import java.util.function.Supplier;
  * 写：afterCommit 后刷新缓存，避免旧值回填窗口
  */
 @Component
+@Slf4j
 public class CacheClient {
 
     private static final ExecutorService REFRESH_POOL = new ThreadPoolExecutor(
@@ -96,26 +98,27 @@ public class CacheClient {
             }
 
             // 已过期：返回旧值 + 异步刷新
-            final String snapshot = json; // lambda 捕获需“有效 final”
+            final String snapshot = json;
             final String lockKey = lockPrefix + id;
-            RLock lock = redisson.getLock(lockKey);
-            if (lock.tryLock()) {
-                REFRESH_POOL.execute(() -> {
-                    try {
-                        String latest = redis.opsForValue().get(key);
-                        if (!Objects.equals(snapshot, latest)) return; // 已被别人刷新
-                        T fresh = dbLoader.apply(id);
-                        if (fresh == null) {
-                            writeLogical(key, null, RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
-                        } else {
-                            writeLogical(key, fresh, logicTtl, unit);
-                        }
-                    } catch (Exception ignore) {
-                    } finally {
-                        if (lock.isHeldByCurrentThread()) lock.unlock();
-                    }
-                });
-            }
+
+            REFRESH_POOL.execute(() -> {
+                RLock lock = redisson.getLock(lockKey);
+                boolean locked = false;
+                try {
+                    locked = lock.tryLock(0, TimeUnit.SECONDS); // 不等待，最多持有10s
+                    if (!locked) return;
+
+                    String latest = redis.opsForValue().get(key);
+                    if (!Objects.equals(snapshot, latest)) return; // 已被别人刷新
+
+                    T fresh = dbLoader.apply(id);
+                    writeLogical(key, fresh, logicTtl, unit); // fresh==null 时写负缓存
+                } catch (Exception e) {
+                    log.warn("async refresh error, key={}", key, e);
+                } finally {
+                    if (locked && lock.isHeldByCurrentThread()) lock.unlock();
+                }
+            });
             // 先返回旧值，保证可用性
             return wrap.getData();
         } catch (Exception e) {

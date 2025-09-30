@@ -1,9 +1,10 @@
 package com.ye94z.payment.service.impl;
 
+import com.ye94z.common.core.constants.RedisConstants;
+import com.ye94z.common.core.dto.PaymentPaidEventDTO;
 import com.ye94z.common.core.dto.Result;
 import com.ye94z.payment.entity.WalletAccount;
 import com.ye94z.payment.entity.WalletTxn;
-import com.ye94z.payment.event.PaymentPaidEvent;
 import com.ye94z.payment.mapper.WalletAccountMapper;
 import com.ye94z.payment.mapper.WalletTxnMapper;
 import com.ye94z.payment.mq.PaymentEventProducer;
@@ -11,6 +12,7 @@ import com.ye94z.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -26,6 +28,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final WalletAccountMapper accountMapper;
     private final WalletTxnMapper txnMapper;
     private final PaymentEventProducer producer;
+    private final StringRedisTemplate redisTemplate;
 
     private static final int DIR_DEBIT = 1;
     private static final int ST_SUCCESS = 2;
@@ -42,7 +45,12 @@ public class PaymentServiceImpl implements PaymentService {
         // 幂等：若已存在该订单的成功流水，直接返回
         WalletTxn exists = txnMapper.findByOrderId(orderId);
         if (exists != null && exists.getStatus() != null && exists.getStatus() == ST_SUCCESS) {
-            return Result.ok(exists.getId());
+            return Result.fail("paid, txnId = " + exists.getId());
+        }
+
+        String isPersisted = redisTemplate.opsForValue().get(RedisConstants.ORDER_PERSISTED_KEY + orderId);
+        if (isPersisted == null) {
+            return Result.fail("订单创建中，稍后再试");
         }
 
         // 扣减余额（乐观锁重试）
@@ -88,12 +96,12 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         final Long txnId = txn.getId();
-        final PaymentPaidEvent evt = new PaymentPaidEvent()
-                .setOrderId(orderId)
-                .setUserId(userId)
-                .setAmountCents(amountCents)
-                .setTxnId(txnId)
-                .setPaidAt(LocalDateTime.now());
+        PaymentPaidEventDTO evt = new PaymentPaidEventDTO();
+        evt.setOrderId(orderId);
+        evt.setUserId(userId);
+        evt.setAmountCents(amountCents);
+        evt.setTxnId(txnId);
+        evt.setPaidAt(LocalDateTime.now());
 
         // 事务提交后发布事件，避免“扣款回滚但发了消息”
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

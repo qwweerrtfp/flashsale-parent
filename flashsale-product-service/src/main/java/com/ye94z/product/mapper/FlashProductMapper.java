@@ -16,8 +16,5 @@ public interface FlashProductMapper {
 
     int decrStockIncrSold(Long productId, Integer quantity);
 
-    /** 上架秒杀商品 */
-    int onSale(Long productId);
-
     int update(ProductDTO productDTO);
 }

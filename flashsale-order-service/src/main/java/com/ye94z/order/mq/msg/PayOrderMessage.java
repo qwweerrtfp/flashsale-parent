@@ -8,5 +8,4 @@ import lombok.experimental.Accessors;
 public class PayOrderMessage {
     private Long orderId;
     private Long userId;
-    private Long payAmountCents;
 }

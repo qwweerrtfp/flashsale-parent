@@ -32,10 +32,10 @@ public class FlashOrder {
     private Long payAmountCents;
 
     /** 订单状态：1=UNPAID,2=PAID,3=FULFILLED,4=CANCELED,5=REFUNDING,6=REFUNDED */
-    private Byte status;
+    private Integer status;
 
     /** 支付渠道：1=BALANCE（本项目仅余额支付） */
-    private Byte payChannel;
+    private Integer payChannel;
 
     /** 支付流水ID(支付库 txn.id) */
     private Long payTxnId;

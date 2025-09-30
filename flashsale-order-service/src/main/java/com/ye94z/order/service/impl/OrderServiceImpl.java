@@ -76,10 +76,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result requestPay(Long userId, Long orderId) {
-        long payAmountCents = flashOrderMapper.findById(orderId).getPayAmountCents();
         if (userId == null || orderId == null) return Result.fail("参数错误");
-        producer.sendPay(new PayOrderMessage().setOrderId(orderId).setUserId(userId).setPayAmountCents(payAmountCents));
-        return Result.ok();
+        // 不在这里查 DB 的 payAmountCents，交给 onPay 消费者读取，避免下单未落库的竞态
+        producer.sendPay(new PayOrderMessage()
+                .setOrderId(orderId)
+                .setUserId(userId));
+        return Result.ok("已受理");
     }
 
     @Override

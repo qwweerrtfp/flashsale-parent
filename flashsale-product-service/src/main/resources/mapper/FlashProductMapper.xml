@@ -45,12 +45,6 @@
             update_time = CURRENT_TIMESTAMP
         WHERE id = #{productId}
     </update>
-    <update id="onSale">
-        UPDATE flash_product
-        SET status      = 2,
-            update_time = CURRENT_TIMESTAMP
-        WHERE id = #{productId}
-    </update>
     <update id="update">
             update flash_product
             <set>

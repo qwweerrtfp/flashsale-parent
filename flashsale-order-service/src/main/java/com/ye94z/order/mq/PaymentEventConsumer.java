@@ -1,10 +1,9 @@
 package com.ye94z.order.mq;
 
 import com.rabbitmq.client.Channel;
-import com.ye94z.order.event.PaymentPaidEvent;
+import com.ye94z.common.core.dto.PaymentPaidEventDTO;
 import com.ye94z.order.mapper.FlashOrderMapper;
 import com.ye94z.order.mq.config.OrderMqConfig;
-import com.ye94z.order.sse.SseHub;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -14,7 +13,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -30,10 +28,9 @@ public class PaymentEventConsumer {
 
     private final FlashOrderMapper orderMapper;
     private final RabbitTemplate rabbitTemplate;
-    //private final SseHub hub;
 
     @RabbitListener(queues = Q_ORDER_PAYMENT_PAID)
-    public void onPaid(PaymentPaidEvent evt, Message  message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
+    public void onPaid(PaymentPaidEventDTO evt, Message message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
         long tag = message.getMessageProperties().getDeliveryTag();
         try {
             int n = orderMapper.markPaidIfUnpaid(evt.getOrderId(), evt.getTxnId(), (byte)1 /*BALANCE*/);
@@ -48,10 +45,11 @@ public class PaymentEventConsumer {
             if (retries >= 2) {
                 log.error("[Order] handle payment paid event error - finally, evt={}", evt, e);
                 rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
+                channel.basicAck(tag, false);
             } else {
+                log.error("[Order] handle payment paid event error, evt={}", evt, e);
                 channel.basicReject(tag, false);
             }
-            log.error("[Order] handle payment paid event error, evt={}", evt, e);
         }
     }
 }

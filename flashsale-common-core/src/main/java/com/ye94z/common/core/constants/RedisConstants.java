@@ -15,11 +15,15 @@ public final class RedisConstants {
     /* 缓存空值（防穿透）统一TTL（分钟） */
     public static final long CACHE_NULL_TTL = 2L;
 
-    /* 店铺缓存（兼容你旧代码；新项目的商品可使用 item 前缀自定义） */
-    public static final String CACHE_SHOP_KEY = "cache:shop:"; // 后接id
-    public static final String LOCK_SHOP_KEY  = "lock:shop:";  // 后接id
+    public static final String ORDER_PERSISTED_KEY = "order:persisted:";
 
-    /* 可留作新商品缓存前缀（如采用）： */
-    // public static final String CACHE_ITEM_KEY = "cache:item:";
-    // public static final String LOCK_ITEM_KEY  = "lock:item:";
+    /** 商品详情 缓存 key 前缀：cache:product:{id} */
+    public static final String CACHE_PRODUCT_KEY = "cache:product:";
+
+    /** 商品详情 重建互斥锁 前缀：lock:product:{id} */
+    public static final String LOCK_PRODUCT_KEY  = "lock:product:";
+
+    /** Redis 实时库存与用户累计的 key 前缀（Lua 里也用这两个） */
+    public static final String STOCK_PREFIX   = "flash:stock:"; // String -> INCRBY/DECRBY
+    public static final String USER_BUY_HASH  = "flash:buy:";   // Hash    -> HINCRBY field=userId
 }

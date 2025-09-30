@@ -29,7 +29,7 @@ public class ProductController {
      */
     @PostMapping("/gate-purchase")
     public Result<Void> gatePurchase(@RequestParam("productId") Long productId,
-                                     @RequestHeader(name = "X-User-Id") Long userId,
+                                     @RequestParam("userId") Long userId,
                                      @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
         log.info("[gatePurchase] productId: {}, userId: {}, quantity: {}", productId, userId, quantity);
         return productService.gatePurchase(productId, userId, quantity);
@@ -44,18 +44,13 @@ public class ProductController {
     }
 
     /**
-     * 回补库存（取消/超时关单时调用）
-     */
-    @PostMapping("/stock/restore")
-    public Result<Void> restoreStock(@RequestParam("productId") Long productId,
-                                     @RequestParam("quantity") Integer quantity,
-                                     @RequestParam("userId") Long userId) {
-        return productService.restoreStock(productId, quantity, userId);
-    }
-
-    /**
      * 上架秒杀商品（包含 redis 库存预热）
      */
+    @PostMapping("/{id}/on-sale")
+    public Result<Void> onSale(@PathVariable("id") Long id){
+        return productService.onSale(id);
+    }
+
     @PostMapping("/update")
     public Result update(@RequestBody ProductDTO productDTO) {
         return productService.update(productDTO);

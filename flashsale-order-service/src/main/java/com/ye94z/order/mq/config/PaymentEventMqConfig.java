@@ -49,7 +49,7 @@ public class PaymentEventMqConfig {
     @Bean
     public Queue orderPaymentPaidRetryQueue() {
         Map<String, Object> args = new HashMap<>();
-        args.put("x-message-ttl", 5000);                     // 重试等待 5s
+        args.put("x-message-ttl", 300);                     // 重试等待 5s
         args.put("x-dead-letter-exchange", EX_PAYMENT_EVENTS);  // 回到支付事件交换机
         args.put("x-dead-letter-routing-key", RK_PAYMENT_PAID); // 同一路由键
         return QueueBuilder.durable(Q_ORDER_PAYMENT_PAID_RETRY).withArguments(args).build();
