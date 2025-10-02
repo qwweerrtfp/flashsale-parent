@@ -15,8 +15,6 @@ public final class RedisConstants {
     /* 缓存空值（防穿透）统一TTL（分钟） */
     public static final long CACHE_NULL_TTL = 2L;
 
-    public static final String ORDER_PERSISTED_KEY = "order:persisted:";
-
     /** 商品详情 缓存 key 前缀：cache:product:{id} */
     public static final String CACHE_PRODUCT_KEY = "cache:product:";
 

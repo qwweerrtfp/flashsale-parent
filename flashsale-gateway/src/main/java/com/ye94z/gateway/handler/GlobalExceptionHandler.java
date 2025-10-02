@@ -1,7 +1,7 @@
 package com.ye94z.gateway.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.cloud.gateway.support.NotFoundException;
 import org.springframework.core.annotation.Order;

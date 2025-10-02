@@ -1,8 +1,8 @@
 package com.ye94z.payment.service.impl;
 
 import com.ye94z.common.core.constants.RedisConstants;
-import com.ye94z.common.core.dto.PaymentPaidEventDTO;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.PaymentPaidEventDTO;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.payment.entity.WalletAccount;
 import com.ye94z.payment.entity.WalletTxn;
 import com.ye94z.payment.mapper.WalletAccountMapper;
@@ -46,11 +46,6 @@ public class PaymentServiceImpl implements PaymentService {
         WalletTxn exists = txnMapper.findByOrderId(orderId);
         if (exists != null && exists.getStatus() != null && exists.getStatus() == ST_SUCCESS) {
             return Result.fail("paid, txnId = " + exists.getId());
-        }
-
-        String isPersisted = redisTemplate.opsForValue().get(RedisConstants.ORDER_PERSISTED_KEY + orderId);
-        if (isPersisted == null) {
-            return Result.fail("订单创建中，稍后再试");
         }
 
         // 扣减余额（乐观锁重试）

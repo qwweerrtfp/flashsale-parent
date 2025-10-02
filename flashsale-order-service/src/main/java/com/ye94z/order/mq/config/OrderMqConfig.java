@@ -11,9 +11,11 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
 
 /**
  * 统一重试：所有主队列失败 -> DLX -> 各自重试队列(5s TTL) -> 回到原交换机/原路由键
@@ -27,12 +29,10 @@ public class OrderMqConfig {
     public static final String EX_ORDER_CMD    = "order.cmd.ex";
     public static final String EX_ORDER_DELAY  = "order.delay.ex";
 
-    public static final String RK_ORDER_CREATE  = "order.create";
     public static final String RK_ORDER_CANCEL  = "order.cancel";
     public static final String RK_ORDER_PAY     = "order.pay";
     public static final String RK_ORDER_TIMEOUT = "order.timeout";
 
-    public static final String Q_ORDER_CREATE  = "order.q.create";
     public static final String Q_ORDER_CANCEL  = "order.q.cancel";
     public static final String Q_ORDER_PAY     = "order.q.pay";
     public static final String Q_ORDER_TIMEOUT = "order.q.timeout";
@@ -87,20 +87,6 @@ public class OrderMqConfig {
         return QueueBuilder.durable(retryQueueName).withArguments(args).build();
     }
 
-    /* === 创建订单：主队列 + 绑定到命令交换机 === */
-    @Bean public Queue qOrderCreate() { return mainQueueWithDlx(Q_ORDER_CREATE); }
-    @Bean public Binding bindCreate(TopicExchange orderCmdExchange, Queue qOrderCreate) {
-        return BindingBuilder.bind(qOrderCreate).to(orderCmdExchange).with(RK_ORDER_CREATE);
-    }
-    // 对应重试队列：5s 后回 EX_ORDER_CMD + RK_ORDER_CREATE
-    public static final String Q_ORDER_CREATE_RETRY = Q_ORDER_CREATE + ".retry";
-    @Bean public Queue qOrderCreateRetry() {
-        return retryQueue(Q_ORDER_CREATE_RETRY, EX_ORDER_CMD, RK_ORDER_CREATE, 300);
-    }
-    @Bean public Binding bindCreateRetry(DirectExchange globalDlx, Queue qOrderCreateRetry) {
-        return BindingBuilder.bind(qOrderCreateRetry).to(globalDlx).with(RK_RETRY);
-    }
-
     /* === 取消订单 === */
     @Bean public Queue qOrderCancel() { return mainQueueWithDlx(Q_ORDER_CANCEL); }
     @Bean public Binding bindCancel(TopicExchange orderCmdExchange, Queue qOrderCancel) {
@@ -149,6 +135,7 @@ public class OrderMqConfig {
 
     /** 2) RabbitTemplate 走同一个 JSON Converter，并开启 Confirm/Return 便于排障 */
     @Bean
+    @Primary
     public RabbitTemplate rabbitTemplate(ConnectionFactory cf, MessageConverter mc) {
         RabbitTemplate t = new RabbitTemplate(cf);
         t.setMessageConverter(mc);
@@ -171,6 +158,21 @@ public class OrderMqConfig {
         return t;
     }
 
+    @Bean("delayTemplate")
+    public RabbitTemplate delayTemplate(ConnectionFactory cf, MessageConverter mc) {
+        var t = new RabbitTemplate(cf); t.setMessageConverter(mc);
+        t.setMandatory(false); // 直接禁用
+        t.setConfirmCallback((corr, ack, cause) -> {
+            String id = corr != null ? corr.getId() : null;
+            if (ack) {
+                log.debug("Confirm OK, id={}", id);
+            } else {
+                log.error("Confirm NACK, id={}, cause={}", id, cause);
+            }
+        });
+        return t;
+    }
+
     /** 3) 监听容器也用同一个 JSON Converter（关键！） */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
@@ -180,6 +182,16 @@ public class OrderMqConfig {
         SimpleRabbitListenerContainerFactory f = new SimpleRabbitListenerContainerFactory();
         configurer.configure(f, cf);
         f.setMessageConverter(mc);
+        // 关键：并发与预取（不做批量）
+        f.setConcurrentConsumers(4);       // 初始并发消费者数（每队列每实例）
+        f.setMaxConcurrentConsumers(8);    // 峰值自动扩到 8
+        f.setPrefetchCount(300);           // 每个消费者一次性抓 300 条放在本地缓冲
+
+        // 你现在消费者里用 basicAck/basicReject，所以必须 MANUAL
+        f.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+
+        // 可选：每个消费者的线程名，便于日志排查
+        // f.setTaskExecutor(Executors.newCachedThreadPool(r -> { Thread t = new Thread(r); t.setName("order-consumer"); return t; }));
         // f.setDefaultRequeueRejected(false); // 视重试/DLX策略需要
         return f;
     }

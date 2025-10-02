@@ -30,21 +30,6 @@
         WHERE id = #{id}
         LIMIT 1
     </select>
-
-    <update id="incrStockDecrSold">
-        UPDATE flash_product
-        SET stock = stock + #{qty},
-            sold = sold - #{qty},
-            update_time = CURRENT_TIMESTAMP
-        WHERE id = #{productId}
-    </update>
-    <update id="decrStockIncrSold">
-        UPDATE flash_product
-        SET stock       = stock - #{qty},
-            sold        = sold + #{qty},
-            update_time = CURRENT_TIMESTAMP
-        WHERE id = #{productId}
-    </update>
     <update id="update">
             update flash_product
             <set>
@@ -54,7 +39,7 @@
                 <if test="description != null">description = #{description},</if>
                 <if test="flashPriceCents != null">flash_price_cents = #{flashPriceCents},</if>
                 <if test="originPriceCents != null">origin_price_cents = #{originPriceCents},</if>
-                <if test="stock != null">stock = #{stock},</if>
+                <if test="initStock != null">stock = #{initStock},</if>
                 <if test="sold != null">sold = #{sold},</if>
                 <if test="limitPerUser != null">limit_per_user = #{limitPerUser},</if>
                 <if test="startTime != null">start_time = #{startTime},</if>
@@ -65,6 +50,4 @@
             </set>
             WHERE id = #{id}
     </update>
-
-
 </mapper>

@@ -1,0 +1,77 @@
+    /* === 创建订单：主队列 + 绑定到命令交换机 === */
+    @Bean public Queue qOrderCreate() { return mainQueueWithDlx(Q_ORDER_CREATE); }
+    @Bean public Binding bindCreate(TopicExchange orderCmdExchange, Queue qOrderCreate) {
+        return BindingBuilder.bind(qOrderCreate).to(orderCmdExchange).with(RK_ORDER_CREATE);
+    }
+    // 对应重试队列：5s 后回 EX_ORDER_CMD + RK_ORDER_CREATE
+    public static final String Q_ORDER_CREATE_RETRY = Q_ORDER_CREATE + ".retry";
+    @Bean public Queue qOrderCreateRetry() {
+        return retryQueue(Q_ORDER_CREATE_RETRY, EX_ORDER_CMD, RK_ORDER_CREATE, 300);
+    }
+    @Bean public Binding bindCreateRetry(DirectExchange globalDlx, Queue qOrderCreateRetry) {
+        return BindingBuilder.bind(qOrderCreateRetry).to(globalDlx).with(RK_RETRY);
+    }
+
+    public void sendCreate(PlaceOrderMessage msg) {
+        MessagePostProcessor mpp = m -> {
+            m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+            m.getMessageProperties().setMessageId(String.valueOf(msg.getOrderId()));
+            return m;
+        };
+        rabbitTemplate.convertAndSend(OrderMqConfig.EX_ORDER_CMD, OrderMqConfig.RK_ORDER_CREATE, msg, mpp);
+        log.info("[MQ] send create: {}", msg);
+    }
+
+        /**
+         * 创建订单：由 Consumer 落库，金额以 product-service 的 flashPrice 为准
+         */
+        @RabbitListener(queues = Q_ORDER_CREATE)
+        public void onCreate(PlaceOrderMessage msg, Message message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
+            long tag = message.getMessageProperties().getDeliveryTag();
+            try {
+                // 1) 查询商品（以服务端价为准）
+                Result<ProductDTO> prodRes = productApi.getProduct(msg.getProductId());
+                if (prodRes == null || !prodRes.isSuccess() || prodRes.getData() == null) {
+                    // 业务无意义的重试，直接吞掉
+                    channel.basicAck(tag, false);
+                    log.warn("[Create] product not found or call failed: productId={}, res={}", msg.getProductId(), prodRes);
+                    return;
+                }
+                ProductDTO p = prodRes.getData();
+                long flashPrice = p.getFlashPriceCents() == null ? 0L : p.getFlashPriceCents();
+                long amount = (long) msg.getQuantity() * flashPrice;
+
+                // 2) 构造订单并落库（幂等依赖唯一键）
+                FlashOrder order = new FlashOrder();
+                order.setId(msg.getOrderId());
+                order.setUserId(msg.getUserId());
+                order.setProductId(msg.getProductId());
+                order.setQuantity(msg.getQuantity());
+                order.setPayAmountCents(amount);
+                order.setStatus(STATUS_UNPAID);
+
+                orderMapper.insert(order);
+
+                redisTemplate.opsForValue().set(ORDER_PERSISTED_KEY + order.getId(), "1", 60, TimeUnit.MINUTES);
+
+                channel.basicAck(tag, false);
+                log.info("[Create] order inserted: {}", order.getId());
+
+                // 注：超时关单的延时消息已在下单入口发出，这里不重复发
+
+            } catch (DuplicateKeyException e) {
+                // 幂等命中（重复消息 / 同人同品唯一约束）
+                channel.basicAck(tag, false);
+                log.info("[Create] duplicate key, ignore. msg={}", msg);
+            } catch (Exception e) {
+                int retries = getRetryCount(xDeath); // 已经走过 DLX 的次数
+                if (retries >= 2) {
+                    // 最终失败：统一丢到 DLT
+                    rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
+                    channel.basicAck(tag, false); // 确认已处理（原消息不再重投）
+                } else {
+                    // 进入 DLX -> 各自 .retry 队列 -> TTL 后回主队列
+                    channel.basicReject(tag, false);
+                }
+            }
+        }

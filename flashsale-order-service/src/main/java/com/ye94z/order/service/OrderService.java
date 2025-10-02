@@ -1,7 +1,8 @@
 package com.ye94z.order.service;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.order.entity.CreateOrderRequest;
+import com.ye94z.order.mq.msg.CancelOrderMessage;
 
 /**
  * 订单领域服务（命令+查询）
@@ -13,11 +14,11 @@ import com.ye94z.order.entity.CreateOrderRequest;
  */
 public interface OrderService {
 
-    /** 异步下单：立即返回 orderId，其余由 MQ 消费端完成 */
-    Result placeOrderAsync(Long userId, CreateOrderRequest req);
+    /** 下单 */
+    Result requestOrder(Long userId, CreateOrderRequest req);
 
     /** 用户主动取消（仅未支付可取消） */
-    Result requestCancel(Long userId, Long orderId);
+    Result requestCancel(Long userId, CancelOrderMessage msg);
 
     /** 发起支付（余额渠道），实际扣款由 payment-service 完成 */
     Result requestPay(Long userId, Long orderId);

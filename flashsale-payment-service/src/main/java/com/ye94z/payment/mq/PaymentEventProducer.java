@@ -1,6 +1,6 @@
 package com.ye94z.payment.mq;
 
-import com.ye94z.common.core.dto.PaymentPaidEventDTO;
+import com.ye94z.common.core.pojo.PaymentPaidEventDTO;
 import com.ye94z.payment.config.PaymentMqConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

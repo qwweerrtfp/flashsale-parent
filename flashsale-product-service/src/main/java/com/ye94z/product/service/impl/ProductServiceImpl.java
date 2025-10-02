@@ -2,8 +2,8 @@ package com.ye94z.product.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ye94z.common.core.constants.RedisConstants;
-import com.ye94z.common.core.dto.ProductDTO;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.ProductDTO;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.product.client.CacheClient;
 import com.ye94z.product.entity.FlashProduct;
 import com.ye94z.product.mapper.FlashProductMapper;
@@ -16,11 +16,13 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,7 +40,6 @@ public class ProductServiceImpl implements ProductService {
     private final FlashProductMapper productMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final CacheClient cacheClient;
-    private final ObjectMapper objectMapper;
 
     /** 逻辑缓存前缀与锁前缀（与 CacheClient 配合） */
     private static final String CACHE_PRODUCT_KEY = RedisConstants.CACHE_PRODUCT_KEY; // "cache:product:"
@@ -46,10 +47,15 @@ public class ProductServiceImpl implements ProductService {
 
     /** 从类路径加载 Lua（ARGV: productId, userId, qty, limitPerUser） */
     private static final DefaultRedisScript<Long> FLASH_GATE_SCRIPT;
+    private static final DefaultRedisScript<Long> RESTORE_STOCK_SCRIPT;
     static {
         FLASH_GATE_SCRIPT = new DefaultRedisScript<>();
         FLASH_GATE_SCRIPT.setLocation(new ClassPathResource("lua/flash_gate.lua"));
         FLASH_GATE_SCRIPT.setResultType(Long.class);
+
+        RESTORE_STOCK_SCRIPT = new DefaultRedisScript<>();
+        RESTORE_STOCK_SCRIPT.setLocation(new ClassPathResource("lua/restore_stock.lua"));
+        RESTORE_STOCK_SCRIPT.setResultType(Long.class);
     }
 
     // -------------------- 对外查询 --------------------
@@ -70,7 +76,7 @@ public class ProductServiceImpl implements ProductService {
 
         ProductDTO dto = new ProductDTO();
         dto.setId(p.getId());
-        dto.setStock(p.getStock());
+        dto.setInitStock(p.getStock());
         dto.setTitle(p.getTitle());
         dto.setFlashPriceCents(p.getFlashPriceCents());
         dto.setOriginPriceCents(p.getOriginPriceCents());
@@ -106,13 +112,14 @@ public class ProductServiceImpl implements ProductService {
         final int limit = (p.getLimitPerUser() == null || p.getLimitPerUser() <= 0) ? 1 : p.getLimitPerUser();
 
         // 2) 执行 Lua：库存 >= qty && (累计+qty) <= limit -> 原子扣库存 & 累计
+        String stockKey = RedisConstants.STOCK_PREFIX + "{" + productId + "}";
+        String buyKey = RedisConstants.USER_BUY_HASH + "{" + productId + "}";
         Long ret = stringRedisTemplate.execute(
                 FLASH_GATE_SCRIPT,
-                Collections.emptyList(),
-                String.valueOf(productId),     // ARGV[1]
-                String.valueOf(userId),        // ARGV[2]
-                String.valueOf(qty),           // ARGV[3]
-                String.valueOf(limit)          // ARGV[4]
+                Arrays.asList(stockKey, buyKey),
+                String.valueOf(userId),        // ARGV[1]
+                String.valueOf(qty),           // ARGV[2]
+                String.valueOf(limit)          // ARGV[3]
         );
         int code = (ret == null) ? -1 : ret.intValue();
         if (code == 0) return Result.ok();
@@ -148,7 +155,7 @@ public class ProductServiceImpl implements ProductService {
         if(!productDTOResult.isSuccess() || productDTOResult.getData() == null){
             return Result.fail("商品不存在");
         }
-        Integer stock = productDTOResult.getData().getStock();
+        Integer stock = productDTOResult.getData().getInitStock();
         if(stock == null) return Result.fail("上架失败, 商品库存为 null");
 
         ProductDTO p = new ProductDTO();
@@ -162,12 +169,33 @@ public class ProductServiceImpl implements ProductService {
             @Override
             public void afterCommit() {
                 try {
-                    stringRedisTemplate.opsForValue().setIfAbsent(RedisConstants.STOCK_PREFIX + id, String.valueOf(stock));
+                    stringRedisTemplate.opsForValue().setIfAbsent(RedisConstants.STOCK_PREFIX + "{" + id + "}", String.valueOf(stock));
+                    cacheClient.refreshAfterCommit(
+                            CACHE_PRODUCT_KEY + id,
+                            () -> productMapper.findById(id),
+                            30, TimeUnit.MINUTES
+                    );
                 } catch (Exception e) {
                     log.warn("[onSale] 缓存库存失败", e);
                 }
             }
         });
+        return Result.ok();
+    }
+
+    @Override
+    public Result restoreStock(Long productId, Long userId, Integer quantity) {
+        String stockKey = RedisConstants.STOCK_PREFIX + "{" + productId + "}";
+        String buyKey = RedisConstants.USER_BUY_HASH + "{" + productId + "}";
+        Long ret = stringRedisTemplate.execute(RESTORE_STOCK_SCRIPT,
+                Arrays.asList(stockKey, buyKey),
+                String.valueOf(userId),
+                String.valueOf(quantity)
+                );
+        if(ret != 0){
+            log.warn("[restoreStock] 恢复库存失败, userId: {}, productId: {}, quantity: {}", userId, productId, quantity);
+            return Result.fail("恢复库存失败");
+        }
         return Result.ok();
     }
 }

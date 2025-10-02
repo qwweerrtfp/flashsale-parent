@@ -1,8 +1,7 @@
 package com.ye94z.product.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.ye94z.common.core.dto.ProductDTO;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.ProductDTO;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,5 +53,13 @@ public class ProductController {
     @PostMapping("/update")
     public Result update(@RequestBody ProductDTO productDTO) {
         return productService.update(productDTO);
+    }
+
+    @PostMapping("/stock/restoreStock")
+    public Result restoreStock(@RequestParam("productId") Long productId,
+                               @RequestParam("userId") Long userId,
+                               @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
+        log.info("[restoreStock] productId: {}, quantity: {}", productId, quantity);
+        return productService.restoreStock(productId, userId, quantity);
     }
 }

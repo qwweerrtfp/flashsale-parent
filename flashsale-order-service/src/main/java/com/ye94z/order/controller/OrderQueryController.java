@@ -1,6 +1,6 @@
 package com.ye94z.order.controller;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.order.service.OrderService;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

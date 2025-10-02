@@ -1,7 +1,7 @@
 package com.ye94z.order.mq;
 
 import com.rabbitmq.client.Channel;
-import com.ye94z.common.core.dto.PaymentPaidEventDTO;
+import com.ye94z.common.core.pojo.PaymentPaidEventDTO;
 import com.ye94z.order.mapper.FlashOrderMapper;
 import com.ye94z.order.mq.config.OrderMqConfig;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.ye94z.user.service;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.user.dto.LoginFormDTO;
 import com.ye94z.user.entity.UserAccount;
 

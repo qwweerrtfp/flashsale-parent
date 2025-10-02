@@ -1,7 +1,8 @@
 package com.ye94z.order.controller;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.order.entity.CreateOrderRequest;
+import com.ye94z.order.mq.msg.CancelOrderMessage;
 import com.ye94z.order.service.OrderService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -30,7 +31,7 @@ public class OrderCommandController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public Result create(@RequestHeader(name = "X-User-Id", required = false) Long userId,
                          @Valid @RequestBody CreateOrderRequest req) {
-        return orderService.placeOrderAsync(userId, req);
+        return orderService.requestOrder(userId, req);
     }
 
     /**
@@ -38,8 +39,8 @@ public class OrderCommandController {
      */
     @PostMapping("/{orderId}/cancel")
     public Result cancel(@RequestHeader("X-User-Id") Long userId,
-                         @PathVariable("orderId") @NotNull @Min(1) Long orderId) {
-        return orderService.requestCancel(userId, orderId);
+                         @RequestBody CancelOrderMessage msg) {
+        return orderService.requestCancel(userId, msg);
     }
 
     /**

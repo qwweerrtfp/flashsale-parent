@@ -11,23 +11,21 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OrderCommandProducer {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void sendCreate(PlaceOrderMessage msg) {
-        MessagePostProcessor mpp = m -> {
-            m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-            m.getMessageProperties().setMessageId(String.valueOf(msg.getOrderId()));
-            return m;
-        };
-        rabbitTemplate.convertAndSend(OrderMqConfig.EX_ORDER_CMD, OrderMqConfig.RK_ORDER_CREATE, msg, mpp);
-        log.info("[MQ] send create: {}", msg);
+    @Qualifier("delayTemplate")
+    private final RabbitTemplate delayTemplate;
+
+    public OrderCommandProducer(RabbitTemplate rabbitTemplate, @Qualifier("delayTemplate") RabbitTemplate delayTemplate) {
+        this.rabbitTemplate = rabbitTemplate;
+        this.delayTemplate = delayTemplate;
     }
 
     public void sendCancel(CancelOrderMessage msg) {
@@ -58,7 +56,7 @@ public class OrderCommandProducer {
             m.getMessageProperties().setHeader("x-delay", delayMs);
             return m;
         };
-        rabbitTemplate.convertAndSend(OrderMqConfig.EX_ORDER_DELAY, OrderMqConfig.RK_ORDER_TIMEOUT, msg, mpp);
+        delayTemplate.convertAndSend(OrderMqConfig.EX_ORDER_DELAY, OrderMqConfig.RK_ORDER_TIMEOUT, msg, mpp);
         log.info("[MQ] schedule timeout: {} ms, {}", delayMs, msg);
     }
 }

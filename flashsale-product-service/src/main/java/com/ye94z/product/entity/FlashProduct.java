@@ -1,6 +1,8 @@
 package com.ye94z.product.entity;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -8,6 +10,8 @@ import java.time.LocalDateTime;
  * 对应表：flash_product
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class FlashProduct {
     private Long id;                    // 商品ID
     private String title;               // 标题

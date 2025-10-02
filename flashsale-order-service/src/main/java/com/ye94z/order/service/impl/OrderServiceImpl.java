@@ -1,19 +1,26 @@
 package com.ye94z.order.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ye94z.common.api.product.ProductApiClient;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.ProductDTO;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.common.core.utils.SnowflakeIdGenerator;
 import com.ye94z.order.entity.CreateOrderRequest;
+import com.ye94z.order.entity.FlashOrder;
 import com.ye94z.order.mapper.FlashOrderMapper;
 import com.ye94z.order.mq.OrderCommandProducer;
 import com.ye94z.order.mq.msg.CancelOrderMessage;
 import com.ye94z.order.mq.msg.PayOrderMessage;
-import com.ye94z.order.mq.msg.PlaceOrderMessage;
 import com.ye94z.order.mq.msg.TimeoutOrderMessage;
 import com.ye94z.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -28,10 +35,13 @@ public class OrderServiceImpl implements OrderService {
 
     /** 超时关单时长（毫秒） */
     private static final long ORDER_TIMEOUT_MS = 15 * 60 * 1000L;
-    private final FlashOrderMapper flashOrderMapper;
+    private final FlashOrderMapper orderMapper;
+
+    private static final int STATUS_UNPAID = 1;
 
     @Override
-    public Result placeOrderAsync(Long userId, CreateOrderRequest req) {
+    @Transactional(rollbackFor = Exception.class)
+    public Result requestOrder(Long userId, CreateOrderRequest req) {
         if (userId == null || req == null || req.getProductId() == null) {
             return Result.fail("参数错误");
         }
@@ -46,31 +56,51 @@ public class OrderServiceImpl implements OrderService {
 
         // 2) 生成订单号（异步落库）
         long orderId = idGen.nextId();
+        // 1) 查询商品（以服务端价为准）
+        Result<ProductDTO> prodRes = productApiClient.getProduct(req.getProductId());
+        if (prodRes == null || !prodRes.isSuccess() || prodRes.getData() == null) {
+            productApiClient.restoreStock(req.getProductId(), userId, qty);
+            return Result.fail("商品不可售或已下架");
+        }
+        ProductDTO p = prodRes.getData();
+        long flashPrice = p.getFlashPriceCents() == null ? 0L : p.getFlashPriceCents();
+        long amount = qty * flashPrice;
 
-        // 3) 发“创建订单”命令（异步落库&金额以 product 价格为准）
-        PlaceOrderMessage create = new PlaceOrderMessage()
-                .setOrderId(orderId)
-                .setUserId(userId)
-                .setProductId(req.getProductId())
-                .setQuantity(qty);
-        producer.sendCreate(create);
+        FlashOrder order = new FlashOrder();
+        order.setId(orderId);
+        order.setUserId(userId);
+        order.setProductId(req.getProductId());
+        order.setQuantity(qty);
+        order.setPayAmountCents(amount);
+        order.setStatus(STATUS_UNPAID);
 
-        // 4) 发“超时关单”延时命令（夹带 productId/qty，取消时可不查库）
-        TimeoutOrderMessage to = new TimeoutOrderMessage()
-                .setOrderId(orderId)
-                .setProductId(req.getProductId())
-                .setQuantity(qty)
-                .setUserId(userId);
-        producer.sendTimeout(to, ORDER_TIMEOUT_MS);
-
-        // 5) 立即返回
+        try {
+            orderMapper.insert(order);
+        } catch (Exception e) {
+            productApiClient.restoreStock(req.getProductId(), userId, qty);
+            throw e;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // 3) 发“超时关单”延时命令（夹带 productId/qty，取消时可不查库）
+                TimeoutOrderMessage to = new TimeoutOrderMessage()
+                        .setOrderId(orderId)
+                        .setProductId(req.getProductId())
+                        .setQuantity(qty)
+                        .setUserId(userId);
+                producer.sendTimeout(to, ORDER_TIMEOUT_MS);
+            }
+        });
+        // 4) 订单落库，返回订单号
         return Result.ok(orderId);
     }
 
     @Override
-    public Result requestCancel(Long userId, Long orderId) {
-        if (userId == null || orderId == null) return Result.fail("参数错误");
-        producer.sendCancel(new CancelOrderMessage().setOrderId(orderId).setUserId(userId));
+    public Result requestCancel(Long userId, CancelOrderMessage msg) {
+        if (userId == null || msg.getOrderId() == null) return Result.fail("参数错误");
+        msg.setUserId(userId);
+        producer.sendCancel(msg);
         return Result.ok();
     }
 

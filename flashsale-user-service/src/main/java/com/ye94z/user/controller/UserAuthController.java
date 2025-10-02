@@ -4,7 +4,7 @@ package com.ye94z.user.controller;
 import com.ye94z.user.dto.LoginFormDTO;
 import com.ye94z.user.entity.UserAccount;
 import com.ye94z.user.service.UserService;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

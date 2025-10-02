@@ -1,6 +1,6 @@
 package com.ye94z.common.api.payment;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 

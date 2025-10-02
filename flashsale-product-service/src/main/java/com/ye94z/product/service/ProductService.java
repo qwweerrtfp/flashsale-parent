@@ -1,9 +1,7 @@
 package com.ye94z.product.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.ye94z.common.core.dto.ProductDTO;
-import com.ye94z.common.core.dto.Result;
-import org.springframework.transaction.annotation.Transactional;
+import com.ye94z.common.core.pojo.ProductDTO;
+import com.ye94z.common.core.pojo.Result;
 
 public interface ProductService {
 
@@ -16,4 +14,6 @@ public interface ProductService {
     Result<Void> update(ProductDTO productDTO);
 
     Result<Void> onSale(Long id);
+
+    Result restoreStock(Long productId, Long userId, Integer quantity);
 }

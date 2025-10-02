@@ -1,12 +1,12 @@
--- ARGV[1]=productId, ARGV[2]=userId, ARGV[3]=qty, ARGV[4]=limitPerUser
+-- KEYS[1]=stockKey, KEYS[2]=buyKey
+-- ARGV[1]=userId, ARGV[2]=qty, ARGV[3]=limitPerUser
 
-local pid   = ARGV[1]
-local uid   = ARGV[2]
-local qty   = tonumber(ARGV[3])
-local limit = tonumber(ARGV[4]) or 999999
+local stockKey = KEYS[1]          -- String: 剩余库存
+local buyKey   = KEYS[2]         -- Hash:   uid -> 用户累计购买数
 
-local stockKey = 'flash:stock:' .. pid          -- String: 剩余库存
-local buyKey   = 'flash:buy:' .. pid         -- Hash:   uid -> 用户累计购买数
+local uid   = ARGV[1]
+local qty   = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3]) or 999999
 
 -- 1) 校验库存是否足够
 local stock = tonumber(redis.call('GET', stockKey) or '0')

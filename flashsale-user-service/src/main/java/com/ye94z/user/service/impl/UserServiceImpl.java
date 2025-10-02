@@ -2,7 +2,7 @@ package com.ye94z.user.service.impl;
 
 import com.ye94z.common.core.constants.RedisConstants;
 import com.ye94z.common.core.constants.SystemConstants;
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 import com.ye94z.common.core.utils.MyUtils;
 import com.ye94z.common.core.utils.RegexUtils;
 import com.ye94z.payment.security.utils.JwtUtils;

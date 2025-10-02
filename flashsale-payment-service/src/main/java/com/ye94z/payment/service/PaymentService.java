@@ -1,6 +1,6 @@
 package com.ye94z.payment.service;
 
-import com.ye94z.common.core.dto.Result;
+import com.ye94z.common.core.pojo.Result;
 
 public interface PaymentService {
     /**

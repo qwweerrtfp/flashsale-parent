@@ -8,4 +8,6 @@ import lombok.experimental.Accessors;
 public class CancelOrderMessage {
     private Long orderId;
     private Long userId;
+    private Long productId;
+    private Integer quantity;
 }
