@@ -5,8 +5,10 @@ import com.ye94z.common.core.pojo.Result;
 
 public interface ProductService {
 
-    /** 闸口校验（Lua 原子校验 + 预扣） */
-    Result<Void> gatePurchase(Long productId, Long userId, Integer quantity);
+    /**
+     * 闸口校验（Lua 原子校验 + 预扣）
+     */
+    Result<Long> gatePurchase(Long productId, Long userId, Integer quantity);
 
     /** 获取商品详情（给下单侧确认价格/限购等） */
     Result<ProductDTO> getProduct(Long id);

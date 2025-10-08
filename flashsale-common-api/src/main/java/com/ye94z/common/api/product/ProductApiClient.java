@@ -23,7 +23,7 @@ public interface ProductApiClient {
      * 秒杀闸口（Lua 原子校验/预扣/去重 等），true 表示允许继续下单
      */
     @PostMapping("/gate-purchase")
-    Result<Boolean> gatePurchase(@RequestParam("productId") Long productId,
+    Result<Long> gatePurchase(@RequestParam("productId") Long productId,
                                  @RequestParam("userId") Long userId,
                                  @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity);
 

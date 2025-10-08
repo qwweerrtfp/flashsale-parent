@@ -30,4 +30,4 @@ mybatis:
 
 logging:
   level:
-    com.worthy.product: info
+    com.ye94z.product: warn

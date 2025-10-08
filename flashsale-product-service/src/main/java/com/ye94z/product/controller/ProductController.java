@@ -27,7 +27,7 @@ public class ProductController {
      * 闸口校验（Lua 原子：库存、每人限购累计、原子扣减）
      */
     @PostMapping("/gate-purchase")
-    public Result<Void> gatePurchase(@RequestParam("productId") Long productId,
+    public Result<Long> gatePurchase(@RequestParam("productId") Long productId,
                                      @RequestParam("userId") Long userId,
                                      @RequestParam(value = "quantity", required = false, defaultValue = "1") Integer quantity) {
         log.info("[gatePurchase] productId: {}, userId: {}, quantity: {}", productId, userId, quantity);

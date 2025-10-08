@@ -24,30 +24,36 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual         # 消费端手动 ack
-        default-requeue-rejected: false # <<< 业务异常抛出后不回原队列，交给 DLX/重试队列
-        prefetch: 100                   # 每次拉取多少条，视并发与业务耗时调
-        concurrency: 2                  # 并发消费者数
+        default-requeue-rejected: false  # 业务异常不回原队列，交给 DLX/重试队列
+        prefetch: 100                    # 每次预取
+        concurrency: 2                   # 并发消费者数
         max-concurrency: 8
 
   data:
     redis:
       host: localhost
       port: 6379
+
   cloud:
+    openfeign:
+      # === 选用 Apache HttpClient（feign-httpclient） ===
+      httpclient:
+        hc5:
+          enabled: true
     nacos:
-      server-addr: 127.0.0.1:8848
-
-
+      discovery:
+        server-addr: 127.0.0.1:8848
 
 mybatis:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: com.ye94z.order.entity
   configuration:
     map-underscore-to-camel-case: true
-    # 打印SQL（开发阶段可开）
     # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-
 logging:
   level:
-    com.ye94z.order: INFO
-
+    com.ye94z.order: warn
+    org.apache.hc.client5.http: INFO   # 如果走HC5
+    # 若需排查 Feign 问题，可临时打开：
+    # feign: DEBUG
+    # org.springframework.cloud.openfeign: DEBUG

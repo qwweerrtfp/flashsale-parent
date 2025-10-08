@@ -1,6 +1,5 @@
 package com.ye94z.product.service.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ye94z.common.core.constants.RedisConstants;
 import com.ye94z.common.core.pojo.ProductDTO;
 import com.ye94z.common.core.pojo.Result;
@@ -19,10 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -90,7 +86,7 @@ public class ProductServiceImpl implements ProductService {
     // -------------------- 下单闸口（热点0DB） --------------------
 
     @Override
-    public Result<Void> gatePurchase(Long productId, Long userId, Integer quantity) {
+    public Result<Long> gatePurchase(Long productId, Long userId, Integer quantity) {
         if (productId == null || userId == null) return Result.fail("参数错误");
         final int qty = (quantity == null || quantity <= 0) ? 1 : quantity;
 
@@ -122,7 +118,8 @@ public class ProductServiceImpl implements ProductService {
                 String.valueOf(limit)          // ARGV[3]
         );
         int code = (ret == null) ? -1 : ret.intValue();
-        if (code == 0) return Result.ok();
+
+        if (code == 0) return Result.ok(p.getFlashPriceCents());
 
         return switch (code) {
             case 1 -> Result.fail("库存不足");
