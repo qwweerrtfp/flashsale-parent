@@ -1,11 +1,14 @@
 server:
+  # 用户服务端口，对外一般通过网关访问，这里主要用于本地直连调试。
   port: 9010
 
 spring:
   application:
+    # 注册到 Nacos 的服务名。
     name: flashsale-user-service
 
   datasource:
+    # 用户库连接配置。
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/fs_user?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
@@ -13,10 +16,12 @@ spring:
 
   data:
     redis:
+      # Redis 主要用于验证码存储。
       host: localhost
       timeout: 2000ms
       database: 0
       port: 6379
   cloud:
     nacos:
+      # 注册中心地址。
       server-addr: 127.0.0.1:8848

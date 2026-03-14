@@ -4,6 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ye94z.payment.mapper.WalletAccountMapper">
 
+    <!-- 钱包账户基础字段映射。 -->
     <resultMap id="BaseMap" type="com.ye94z.payment.entity.WalletAccount">
         <id     column="id"             property="id"/>
         <result column="user_id"        property="userId"/>
@@ -14,6 +15,7 @@
         <result column="update_time"    property="updateTime"/>
     </resultMap>
 
+    <!-- 根据 user_id 查询钱包账户，支付前会先读取余额和版本号。 -->
     <select id="findByUserId" resultMap="BaseMap">
         select id, user_id, balance_cents, freeze_cents, version, create_time, update_time
         from pay_wallet_account
@@ -21,6 +23,10 @@
         limit 1
     </select>
 
+    <!--
+      乐观锁扣减余额。
+      只有版本号命中且余额足够时才会更新成功，从而避免并发扣款把余额扣成负数。
+    -->
     <update id="deductBalance">
         update pay_wallet_account
         set balance_cents = balance_cents - #{amount},

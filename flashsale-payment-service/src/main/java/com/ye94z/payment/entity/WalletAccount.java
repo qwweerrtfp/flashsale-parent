@@ -3,12 +3,19 @@ package com.ye94z.payment.entity;
 import java.time.LocalDateTime;
 
 public class WalletAccount {
+    /** 主键 ID。 */
     private Long id;
+    /** 用户 ID。 */
     private Long userId;
+    /** 可用余额，单位分。 */
     private Long balanceCents;
+    /** 冻结余额，预留给更复杂的支付场景。 */
     private Long freezeCents;
+    /** 乐观锁版本号。 */
     private Integer version;
+    /** 创建时间。 */
     private LocalDateTime createTime;
+    /** 更新时间。 */
     private LocalDateTime updateTime;
 
     public Long getId() { return id; }

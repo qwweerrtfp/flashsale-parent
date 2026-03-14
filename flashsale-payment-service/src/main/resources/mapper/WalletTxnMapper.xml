@@ -4,6 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ye94z.payment.mapper.WalletTxnMapper">
 
+    <!-- 支付流水字段映射。 -->
     <resultMap id="BaseMap" type="com.ye94z.payment.entity.WalletTxn">
         <id     column="id"            property="id"/>
         <result column="user_id"       property="userId"/>
@@ -19,12 +20,14 @@
         <result column="update_time"   property="updateTime"/>
     </resultMap>
 
+    <!-- 根据订单号查流水，用于幂等判断。 -->
     <select id="findByOrderId" resultMap="BaseMap">
         select * from pay_wallet_txn
         where order_id = #{orderId}
         limit 1
     </select>
 
+    <!-- 插入支付流水，并把数据库自增主键回填到实体。 -->
     <insert id="insert" parameterType="com.ye94z.payment.entity.WalletTxn" useGeneratedKeys="true" keyProperty="id">
         insert into pay_wallet_txn
         (user_id, order_id, amount_cents, direction, status, biz_type, channel, idempotency_key, remark, create_time, update_time)

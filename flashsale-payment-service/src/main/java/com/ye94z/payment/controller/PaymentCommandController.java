@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 内部调用接口：余额支付
- * POST /internal/payments/pay
+ * 支付服务内部命令接口。
+ * 当前主要由 order-service 调用，不直接作为前端公开 API。
  */
 @RestController
 @RequestMapping("/internal/payments")
@@ -16,6 +16,7 @@ public class PaymentCommandController {
 
     private final PaymentService paymentService;
 
+    /** 余额支付入口，成功时返回支付流水 ID。 */
     @PostMapping("/pay")
     public Result<Long> pay(@RequestParam("userId") Long userId,
                             @RequestParam("orderId") Long orderId,

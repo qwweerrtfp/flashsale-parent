@@ -18,8 +18,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderCommandProducer {
 
+    /** 普通命令消息模板。 */
     private final RabbitTemplate rabbitTemplate;
 
+    /** 专门用于延时交换机的消息模板。 */
     @Qualifier("delayTemplate")
     private final RabbitTemplate delayTemplate;
 
@@ -30,6 +32,7 @@ public class OrderCommandProducer {
 
     public void sendCancel(CancelOrderMessage msg) {
         MessagePostProcessor mpp = m -> {
+            // 配置消息持久化和 messageId，方便 Broker 持久保存与排障。
             m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
             m.getMessageProperties().setMessageId(String.valueOf(msg.getOrderId()));
             return m;
@@ -48,11 +51,12 @@ public class OrderCommandProducer {
         log.info("[MQ] send pay: {}", msg);
     }
 
-    /** 延时关单（x-delayed-message 插件） */
+    /** 延时关单，通过 x-delayed-message 插件控制延迟投递。 */
     public void sendTimeout(TimeoutOrderMessage msg, long delayMs) {
         MessagePostProcessor mpp = m -> {
             m.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
             m.getMessageProperties().setMessageId(String.valueOf(msg.getOrderId()));
+            // x-delay 是 delayed-message 插件识别的延迟毫秒数。
             m.getMessageProperties().setHeader("x-delay", delayMs);
             return m;
         };

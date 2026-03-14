@@ -1,17 +1,21 @@
 server:
+  # 订单服务端口。
   port: 9030
 
 spring:
   application:
+    # Nacos 中的服务名。
     name: flashsale-order-service
 
   datasource:
+    # 订单库连接配置。
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/fs_order?characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: whc7777777
 
   rabbitmq:
+    # 订单服务消息最重，支付命令、取消命令和延时关单都走这里。
     host: 127.0.0.1
     port: 5672
     username: guest
@@ -23,6 +27,7 @@ spring:
       mandatory: true
     listener:
       simple:
+        # 这里和 OrderMqConfig 里的手动 ACK 设计保持一致。
         acknowledge-mode: manual         # 消费端手动 ack
         default-requeue-rejected: false  # 业务异常不回原队列，交给 DLX/重试队列
         prefetch: 100                    # 每次预取
@@ -31,20 +36,23 @@ spring:
 
   data:
     redis:
+      # Redis 用于分布式锁、库存回补等协作能力。
       host: localhost
       port: 6379
 
   cloud:
     openfeign:
-      # === 选用 Apache HttpClient（feign-httpclient） ===
+      # 显式启用 Apache HttpClient5 作为 Feign 底层 HTTP 客户端。
       httpclient:
         hc5:
           enabled: true
     nacos:
       discovery:
+        # 服务注册与发现地址。
         server-addr: 127.0.0.1:8848
 
 mybatis:
+  # MyBatis 配置：订单 Mapper XML 与实体别名。
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: com.ye94z.order.entity
   configuration:
@@ -52,6 +60,7 @@ mybatis:
     # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 logging:
   level:
+    # 默认压低业务日志，保留 HC5 日志便于排查 Feign 连接问题。
     com.ye94z.order: warn
     org.apache.hc.client5.http: INFO   # 如果走HC5
     # 若需排查 Feign 问题，可临时打开：

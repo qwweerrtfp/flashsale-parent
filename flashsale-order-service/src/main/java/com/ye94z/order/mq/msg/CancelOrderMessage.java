@@ -6,8 +6,12 @@ import lombok.experimental.Accessors;
 @Data
 @Accessors(chain = true)
 public class CancelOrderMessage {
+    /** 订单 ID。 */
     private Long orderId;
+    /** 用户 ID。 */
     private Long userId;
+    /** 商品 ID。 */
     private Long productId;
+    /** 取消时需要回补的数量。 */
     private Integer quantity;
 }

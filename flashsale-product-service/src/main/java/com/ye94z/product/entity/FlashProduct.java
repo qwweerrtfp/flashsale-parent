@@ -7,7 +7,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 对应表：flash_product
+ * 商品实体，对应 flash_product 表。
+ * 它是 product-service 内部的持久化对象，不直接暴露给外部接口。
  */
 @Data
 @NoArgsConstructor

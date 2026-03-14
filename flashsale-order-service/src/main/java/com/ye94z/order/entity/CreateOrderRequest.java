@@ -3,7 +3,8 @@ package com.ye94z.order.entity;
 import lombok.Data;
 
 /**
- * 下单请求体（放在 entity 包按你的要求归档）
+ * 下单请求体。
+ * 这里只保留真正需要由调用方提供的字段，金额等敏感信息统一由后端确认。
  */
 @Data
 public class CreateOrderRequest {

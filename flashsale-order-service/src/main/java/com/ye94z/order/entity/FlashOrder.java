@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 对应表：flash_order
+ * 订单实体，对应 flash_order 表。
+ * 它是订单服务内部最核心的持久化对象，也是消息消费者最常读取的领域对象。
  */
 @Data
 @Builder
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class FlashOrder {
 
-    /** 订单ID(雪花/自生成) */
+    /** 订单 ID（由雪花算法生成）。 */
     private Long id;
 
     /** 用户ID */

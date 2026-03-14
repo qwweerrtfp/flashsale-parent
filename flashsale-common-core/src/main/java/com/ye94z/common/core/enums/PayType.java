@@ -1,6 +1,9 @@
 package com.ye94z.common.core.enums;
 
-/** 支付方式：1余额；2支付宝；3微信（你的支付服务先实现余额） */
+/**
+ * 支付方式枚举。
+ * 当前项目真正落地的是余额支付，其他渠道更多是为后续扩展预留编码位。
+ */
 public enum PayType {
     BALANCE((byte)1, "余额"),
     ALIPAY((byte)2, "支付宝"),
@@ -17,6 +20,7 @@ public enum PayType {
     public byte getCode() { return code; }
     public String getDesc() { return desc; }
 
+    /** 将数据库或消息中的支付方式编码转换成枚举。 */
     public static PayType fromCode(Byte code) {
         if (code == null) return null;
         for (PayType p : values()) {

@@ -1,10 +1,13 @@
 server:
+  # 商品服务端口。
   port: 9020
 
 spring:
   application:
+    # Nacos 中的服务名。
     name: flashsale-product-service
   datasource:
+    # 商品库连接配置。
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/fs_product?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
@@ -12,17 +15,21 @@ spring:
   cloud:
     nacos:
       discovery:
+        # 商品服务注册到 Nacos，供网关和订单服务发现。
         server-addr: 127.0.0.1:8848
   jackson:
+    # Jackson 的 null 字段和时区策略。
     default-property-inclusion: non_null
     time-zone: Asia/Shanghai
   data:
     redis:
+      # 商品服务的 Redis 用于缓存、库存和限购累计。
       host: 127.0.0.1
       port: 6379
 
 
 mybatis:
+  # MyBatis XML 映射与别名扫描配置。
   mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.worthy.product.entity
   configuration:
@@ -30,4 +37,5 @@ mybatis:
 
 logging:
   level:
+    # 默认压低商品服务业务日志级别，避免秒杀压测时日志过大。
     com.ye94z.product: warn

@@ -36,26 +36,31 @@ import static com.ye94z.order.mq.config.OrderMqConfig.*;
 @RequiredArgsConstructor
 public class OrderCommandConsumer {
 
+    /** 订单表访问层。 */
     private final FlashOrderMapper orderMapper;
+    /** 商品服务 Feign。 */
     private final ProductApiClient productApi;
+    /** 支付服务 Feign。 */
     private final PaymentApiClient paymentApi;
+    /** 用于把最终失败消息送入 DLT。 */
     private final RabbitTemplate rabbitTemplate;
+    /** 预留 Redis 访问能力。 */
     private final StringRedisTemplate redisTemplate;
 
     private static final int STATUS_UNPAID = 1;
     private static final int STATUS_CANCELED = 4;
 
-    /**
-     * 用户主动取消（仅未支付 -> 已取消），回补库存
-     */
+    /** 处理主动取消命令，成功后回补库存。 */
     @RabbitListener(queues = Q_ORDER_CANCEL)
     public void onCancel(CancelOrderMessage msg, Message message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
         long tag = message.getMessageProperties().getDeliveryTag();
         try {
+            // 只有状态仍是 UNPAID 时，才允许切换到 CANCELED。
             int n = orderMapper.updateStatusIf(
                     msg.getOrderId(), STATUS_UNPAID, STATUS_CANCELED, LocalDateTime.now());
 
             if (n > 0) {
+                // 订单取消成功后，通知商品服务释放库存名额。
                 Result result = productApi.restoreStock(msg.getProductId(), msg.getUserId(), msg.getQuantity());
                 if (result.isSuccess()) {
                     log.info("[Cancel] restored stock, orderId={}", msg.getOrderId());
@@ -68,34 +73,32 @@ public class OrderCommandConsumer {
         } catch (Exception e) {
             int retries = getRetryCount(xDeath);
             if (retries >= 2) {
-                channel.basicAck(tag, false); // 终结当前消息
-                // 投 DLT 留痕
+                channel.basicAck(tag, false);
+                // 超过重试上限后写入最终死信队列，便于人工排查。
                 rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
                 log.error("[Cancel] error (to DLT), msg={}", msg, e);
             } else {
-                // 让它进 DLX 的重试队列（前提：主队列配置了 DLX + RK_RETRY）
-                channel.basicReject(tag, false); // 等价于 nack(requeue=false)
+                // 走统一 DLX -> retry 队列 -> 回原队列的重试链路。
+                channel.basicReject(tag, false);
                 log.warn("[Cancel] error, retry later. msg={}, retries={}", msg, retries, e);
             }
         }
     }
 
-    /**
-     * 发起支付（异步占位，真正扣款由 payment-service 完成）
-     */
+    /** 处理支付命令，读取订单并调用 payment-service 实际扣款。 */
     @RabbitListener(queues = Q_ORDER_PAY)
     public void onPay(PayOrderMessage msg, Message message, Channel channel,
                       @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
         long tag = message.getMessageProperties().getDeliveryTag();
         try {
-            // 1) 读取订单
+            // 1) 消费时再读取订单，避免和下单事务时序冲突。
             FlashOrder o = orderMapper.findById(msg.getOrderId());
             if (o == null) {
-                // 让它走重试链路
+                // 订单暂时不可见时先走重试，给数据库提交留时间。
                 channel.basicReject(tag, false);
                 return;
             }
-            // 2) 归属 & 状态校验
+            // 2) 校验订单归属和状态，避免替别人支付或重复支付。
             if (!o.getUserId().equals(msg.getUserId())) {
                 channel.basicAck(tag, false);
                 return;
@@ -106,23 +109,23 @@ public class OrderCommandConsumer {
                 return;
             }
 
-            // 3) 调用支付（金额以落库后的金额为准，避免被篡改）
+            // 3) 金额以订单表里固化的金额为准，不信任外部输入。
             long amount = o.getPayAmountCents();
             Result<Long> ret = paymentApi.pay(o.getUserId(), o.getId(), amount);
             log.info("[Pay] pay api ret: {}", ret);
 
             if (ret != null && ret.isSuccess()) {
-                // 真正的状态变更仍由“支付成功事件”来驱动，这里只 ack
+                // 真正的订单状态回写仍由支付成功事件驱动，这里只确认支付命令已处理。
                 channel.basicAck(tag, false);
                 log.info("[Pay] debit ok, txnId={}", ret.getData());
             } else {
-                // 简单错误分流：可按错误码/信息判断是否可重试
+                // 简单按错误文案区分是否值得重试。
                 String msgText = (ret == null ? "null" : ret.getErrorMsg());
                 boolean retryable = msgText != null && (msgText.contains("繁忙") || msgText.contains("稍后"));
                 if (retryable) {
-                    channel.basicReject(tag, false);  // 回原路由 → .retry → 再次到达
+                    channel.basicReject(tag, false);
                 } else {
-                    channel.basicAck(tag, false);     // 不可重试直接吞
+                    channel.basicAck(tag, false);
                 }
                 log.warn("[Pay] debit fail: {}", msgText);
             }
@@ -138,9 +141,7 @@ public class OrderCommandConsumer {
         }
     }
 
-    /**
-     * 超时关单（延时队列）
-     */
+    /** 处理延时关单消息，超时未支付时关闭订单并回补库存。 */
     @RabbitListener(queues = Q_ORDER_TIMEOUT)
     public void onTimeout(TimeoutOrderMessage msg,
                           Message message,
@@ -153,6 +154,7 @@ public class OrderCommandConsumer {
                     msg.getOrderId(), STATUS_UNPAID, STATUS_CANCELED, LocalDateTime.now());
 
             if (n > 0) {
+                // 只有订单真的从未支付变成已取消，才进行库存补偿。
                 Result result = productApi.restoreStock(msg.getProductId(), msg.getUserId(), msg.getQuantity());
                 if (result.isSuccess()) {
                     log.info("[Timeout] restored stock, orderId={}", msg.getOrderId());
@@ -164,7 +166,7 @@ public class OrderCommandConsumer {
                 return;
             }
 
-            // 已支付等：直接 ack
+            // 已支付或已被其他流程处理时，超时消息不再介入。
             channel.basicAck(tag, false);
             log.info("[Timeout] no-op (paid or status changed): {}", msg.getOrderId());
 
@@ -187,6 +189,7 @@ public class OrderCommandConsumer {
         if (xDeath == null || xDeath.isEmpty()) return 0;
         long total = 0;
         for (Map<String, Object> h : xDeath) {
+            // RabbitMQ 会在 x-death 头里记录每次死信次数，这里做累加。
             Object c = h.get("count");
             if (c instanceof Number n) total += n.longValue();
         }

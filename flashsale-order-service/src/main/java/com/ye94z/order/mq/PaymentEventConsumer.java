@@ -33,6 +33,7 @@ public class PaymentEventConsumer {
     public void onPaid(PaymentPaidEventDTO evt, Message message, Channel channel, @Header(name = "x-death", required = false) List<Map<String, Object>> xDeath) throws IOException {
         long tag = message.getMessageProperties().getDeliveryTag();
         try {
+            // 只允许未支付订单切换为已支付，重复事件或已取消订单都会自然 no-op。
             int n = orderMapper.markPaidIfUnpaid(evt.getOrderId(), evt.getTxnId(), (byte)1 /*BALANCE*/);
             if (n > 0) {
                 log.info("[Order] mark PAID success, orderId={}, txnId={}", evt.getOrderId(), evt.getTxnId());
@@ -43,6 +44,7 @@ public class PaymentEventConsumer {
         } catch (Exception e) {
             int retries = OrderCommandConsumer.getRetryCount(xDeath);
             if (retries >= 2) {
+                // 支付成功事件非常关键，最终失败要保留到 DLT 便于人工补偿。
                 log.error("[Order] handle payment paid event error - finally, evt={}", evt, e);
                 rabbitTemplate.send(OrderMqConfig.EX_GLOBAL_DLX, OrderMqConfig.RK_DLT, message);
                 channel.basicAck(tag, false);

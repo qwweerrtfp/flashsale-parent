@@ -3,16 +3,25 @@ package com.ye94z.user.entity;
 import java.time.LocalDateTime;
 
 /**
- * 映射表：fs_user.user_account
+ * 用户实体，映射 user_account 表。
+ * 这里使用的是最朴素的 JavaBean 写法，便于 MyBatis 直接做属性映射。
  */
 public class UserAccount {
+    /** 主键 ID。 */
     private Long id;
+    /** 用户手机号，也是当前登录体系里的唯一身份标识。 */
     private String phone;
-    private String passwordHash; // password_hash
-    private String nickname;     // nickname
-    private String avatarUrl;    // avatar_url
-    private Short status;        // 1=ACTIVE,0=DISABLED
+    /** 密码哈希。当前验证码登录流程里未使用，属于扩展字段。 */
+    private String passwordHash;
+    /** 用户昵称。 */
+    private String nickname;
+    /** 头像地址。 */
+    private String avatarUrl;
+    /** 用户状态：1=ACTIVE,0=DISABLED。 */
+    private Short status;
+    /** 创建时间。 */
     private LocalDateTime createTime;
+    /** 更新时间。 */
     private LocalDateTime updateTime;
 
     public Long getId() { return id; }

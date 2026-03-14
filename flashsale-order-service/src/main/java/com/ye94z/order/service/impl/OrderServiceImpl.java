@@ -27,16 +27,20 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
+    /** 商品服务 Feign：负责闸口校验与库存回补。 */
     private final ProductApiClient productApiClient;
+    /** 订单消息生产者。 */
     private final OrderCommandProducer producer;
 
-    // 简单雪花：可后续抽到单例或注入
+    // 当前直接内置雪花 ID 生成器，满足示例项目的分布式订单号需求。
     private final SnowflakeIdGenerator idGen = new SnowflakeIdGenerator(1, 1);
 
-    /** 超时关单时长（毫秒） */
+    /** 超时关单时长。 */
     private static final long ORDER_TIMEOUT_MS = 15 * 60 * 1000L;
+    /** 订单表访问层。 */
     private final FlashOrderMapper orderMapper;
 
+    /** 订单初始状态：未支付。 */
     private static final int STATUS_UNPAID = 1;
 
     @Override
@@ -47,14 +51,14 @@ public class OrderServiceImpl implements OrderService {
         }
         int qty = (req.getQuantity() == null || req.getQuantity() <= 0) ? 1 : req.getQuantity();
 
-        // 1) 调用 product-service 的“闸口”校验（Lua 内部：库存、用户累计购买数<=限购、扣库存&累计）
+        // 1) 下单前先让商品服务做资格校验和库存预扣，避免订单服务直接参与热点库存竞争。
         Result<Long> gate = productApiClient.gatePurchase(req.getProductId(), userId, qty);
         if (gate == null || !gate.isSuccess()) {
             String msg = (gate != null && gate.getErrorMsg() != null) ? gate.getErrorMsg() : "不满足购买条件";
             return Result.fail(msg);
         }
 
-        // 2) 生成订单号
+        // 2) 基于商品服务返回的秒杀价计算订单金额，并生成订单号。
         long orderId = idGen.nextId();
         Long flashPrice = gate.getData();
         flashPrice = flashPrice == null ? 0L : flashPrice;
@@ -71,13 +75,14 @@ public class OrderServiceImpl implements OrderService {
         try {
             orderMapper.insert(order);
         } catch (Exception e) {
+            // 订单落库失败时，要把已经预扣的库存归还回去。
             productApiClient.restoreStock(req.getProductId(), userId, qty);
             throw e;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                // 3) 发“超时关单”延时命令（夹带 productId/qty，取消时可不查库）
+                // 3) 事务提交后再发送延时关单消息，避免“消息先发、订单没落库”的不一致。
                 TimeoutOrderMessage to = new TimeoutOrderMessage()
                         .setOrderId(orderId)
                         .setProductId(req.getProductId())
@@ -86,13 +91,14 @@ public class OrderServiceImpl implements OrderService {
                 producer.sendTimeout(to, ORDER_TIMEOUT_MS);
             }
         });
-        // 4) 订单落库，返回订单号
+        // 4) 到这里订单已经成功创建，接口可以立即返回订单号。
         return Result.ok(orderId);
     }
 
     @Override
     public Result requestCancel(Long userId, CancelOrderMessage msg) {
         if (userId == null || msg.getOrderId() == null) return Result.fail("参数错误");
+        // 用户身份以后端透传的 userId 为准，不信任请求体中的用户字段。
         msg.setUserId(userId);
         producer.sendCancel(msg);
         return Result.ok();
@@ -101,7 +107,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Result requestPay(Long userId, Long orderId) {
         if (userId == null || orderId == null) return Result.fail("参数错误");
-        // 不在这里查 DB 的 payAmountCents，交给 onPay 消费者读取，避免下单未落库的竞态
+        // 不在这里同步查订单金额，把读库动作放到消费者里做，避免和下单事务时序打架。
         producer.sendPay(new PayOrderMessage()
                 .setOrderId(orderId)
                 .setUserId(userId));
@@ -110,11 +116,13 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Result getDetail(Long userId, Long orderId) {
+        // 查询逻辑预留在这里，后续可补订单归属校验和 DTO 装配。
         return Result.fail("未实现：请在 Query 层/Mapper 实现订单详情查询并做归属校验");
     }
 
     @Override
     public Result listMyOrders(Long userId, Integer page, Integer size, Integer status) {
+        // 当前先明确告知未实现，避免调用方误判为功能已可用。
         return Result.fail("未实现：请在 Query 层/Mapper 实现分页列表");
     }
 }

@@ -10,7 +10,10 @@ import java.util.Map;
 
 import static com.ye94z.order.mq.config.OrderMqConfig.*;
 
-/** 订阅 payment-service 的“支付成功事件”，并接入统一 DLX 重试与全局 DLT */
+/**
+ * 订单侧订阅支付成功事件的队列与重试配置。
+ * 支付服务只负责发事件，订单服务自己声明消费队列和重试链路。
+ */
 @Configuration
 public class PaymentEventMqConfig {
     /** 支付事件交换机 / 路由键（与 payment-service 发布端保持一致） */
@@ -22,13 +25,13 @@ public class PaymentEventMqConfig {
     /** 对应的重试队列（5s 后回到支付事件交换机/同一路由键） */
     public static final String Q_ORDER_PAYMENT_PAID_RETRY  = Q_ORDER_PAYMENT_PAID + ".retry";
 
-    /** 支付事件交换机（topic） */
+    /** 支付事件交换机，名称需要和支付服务发布端保持一致。 */
     @Bean
     public TopicExchange paymentEventExchange() {
         return ExchangeBuilder.topicExchange(EX_PAYMENT_EVENTS).durable(true).build();
     }
 
-    /** 主队列：绑定统一 DLX，当消费失败（basicReject(false)）时路由到 EX_GLOBAL_DLX 的 "retry" */
+    /** 主队列：消费失败时通过全局 DLX 进入重试队列。 */
     @Bean
     public Queue orderPaymentPaidQueue() {
         Map<String, Object> args = new HashMap<>();
@@ -38,14 +41,14 @@ public class PaymentEventMqConfig {
         return QueueBuilder.durable(Q_ORDER_PAYMENT_PAID).withArguments(args).build();
     }
 
-    /** 绑定：支付事件交换机 -> 主队列（支付成功事件） */
+    /** 把支付成功事件绑定到订单侧消费队列。 */
     @Bean
     public Binding orderPaymentPaidBinding(TopicExchange paymentEventExchange,
                                            Queue orderPaymentPaidQueue) {
         return BindingBuilder.bind(orderPaymentPaidQueue).to(paymentEventExchange).with(RK_PAYMENT_PAID);
     }
 
-    /** 重试队列：5s 到期后回原交换机/原路由键（再次投递“支付成功事件”） */
+    /** 重试队列：TTL 到期后回到 payment.events/paid。 */
     @Bean
     public Queue orderPaymentPaidRetryQueue() {
         Map<String, Object> args = new HashMap<>();
@@ -55,7 +58,7 @@ public class PaymentEventMqConfig {
         return QueueBuilder.durable(Q_ORDER_PAYMENT_PAID_RETRY).withArguments(args).build();
     }
 
-    /** 绑定：全局 DLX -> 本队列的重试队列（routingKey=retry） */
+    /** 把全局 DLX 的 retry 路由键绑定到支付事件重试队列。 */
     @Bean
     public Binding orderPaymentPaidRetryBinding(
             @Qualifier("globalDlx") DirectExchange globalDlx,

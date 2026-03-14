@@ -5,6 +5,10 @@
 
 <mapper namespace="com.ye94z.user.mapper.UserMapper">
 
+    <!--
+      这份 XML 更像是较早版本的用户表映射，当前主链路里实际使用的是注解式 UserAccountMapper。
+      先保留作为参考，避免直接删除影响你后续比对历史实现。
+    -->
     <!-- 根据手机号查用户 -->
     <select id="getByPhone" resultType="com.ye94z.user.entity.User">
         SELECT id, phone, password, nickname, avatar, status, create_time, update_time

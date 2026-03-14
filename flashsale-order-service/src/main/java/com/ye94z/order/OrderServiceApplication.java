@@ -16,6 +16,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @EnableDiscoveryClient
 public class OrderServiceApplication {
     public static void main(String[] args) {
+        // 订单服务是整个系统的编排中心，会同时依赖 Feign、RabbitMQ 和服务发现。
         SpringApplication.run(OrderServiceApplication.class, args);
     }
 }

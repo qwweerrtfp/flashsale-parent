@@ -30,6 +30,14 @@
         WHERE id = #{id}
         LIMIT 1
     </select>
+
+    <!--
+      动态更新商品。
+      约定：
+      1) 只更新传入 DTO 中非空的字段；
+      2) version 每次更新都会自增，便于后续扩展乐观锁；
+      3) update_time 统一在数据库侧刷新。
+    -->
     <update id="update">
             update flash_product
             <set>

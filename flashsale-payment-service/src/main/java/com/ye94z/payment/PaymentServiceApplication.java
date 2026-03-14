@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class PaymentServiceApplication {
     public static void main(String[] args) {
+        // 启动支付服务，负责余额扣减、支付流水记录和支付成功事件发布。
         SpringApplication.run(PaymentServiceApplication.class, args);
     }
 }

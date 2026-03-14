@@ -6,11 +6,12 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface WalletAccountMapper {
+    /** 按用户 ID 查询钱包账户。 */
     WalletAccount findByUserId(@Param("userId") Long userId);
 
     /**
-     * 乐观扣减余额：命中 version 时才扣减成功
-     * @return 影响行数，1 表示成功；0 表示失败（余额不足或版本冲突）
+     * 乐观锁扣减余额。
+     * 只有 version 命中且余额足够时，更新才会成功。
      */
     int deductBalance(@Param("userId") Long userId,
                       @Param("amount") Long amount,

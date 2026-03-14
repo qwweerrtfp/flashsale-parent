@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 @Order(-2) // 优先级高于默认
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
 
+    /** 网关层单独维护一个 ObjectMapper，把异常统一序列化成 JSON 响应。 */
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
@@ -28,6 +29,7 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
         String message;
 
         if (ex instanceof NotFoundException) {
+            // Gateway 转发不到下游服务时，通常说明注册中心里没有实例。
             status = HttpStatus.SERVICE_UNAVAILABLE;
             message = "Service unavailable";
         } else if (ex instanceof ResponseStatusException rse) {
@@ -41,7 +43,7 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
             message = "Internal server error";
         }
 
-        // 关键改动：返回 Result.fail
+        // 对外始终保持统一响应结构，前端就不需要区分网关错误和业务服务错误。
         Result<?> result = Result.fail(String.valueOf(status.value()), message);
 
         var response = exchange.getResponse();

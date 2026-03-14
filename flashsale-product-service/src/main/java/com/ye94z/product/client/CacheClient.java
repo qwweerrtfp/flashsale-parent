@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 @Slf4j
 public class CacheClient {
 
+    /** 异步刷新缓存的线程池，容量控制得比较小，避免缓存重建本身反过来压垮服务。 */
     private static final ExecutorService REFRESH_POOL = new ThreadPoolExecutor(
             1, 2, 30, TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(1024),
@@ -47,7 +48,10 @@ public class CacheClient {
         this.mapper = mapper;
     }
 
-    /** 读：统一逻辑过期（含防穿透、防击穿、异步刷新） */
+    /**
+     * 统一逻辑过期读取逻辑。
+     * 这个方法把防穿透、防击穿和“过期后返回旧值 + 异步刷新”这几件事封装到了一起。
+     */
     public <T, ID> T getLogical(
             String keyPrefix, String lockPrefix, ID id,
             Class<T> type, Function<ID, T> dbLoader,
@@ -57,7 +61,7 @@ public class CacheClient {
         String json = redis.opsForValue().get(key);
 
         try {
-            // 首次或被清空：需要一次加锁装填（互斥，防击穿）
+            // 首次访问或缓存被清空时，需要由一个线程负责回源并重建缓存。
             if (json == null) {
                 final String lockKey = lockPrefix + id;
                 RLock lock = redisson.getLock(lockKey);
@@ -65,20 +69,21 @@ public class CacheClient {
                 try {
                     locked = lock.tryLock(1, TimeUnit.SECONDS); // 看门狗自动续期
                     if (!locked) {
-                        // 快失败：不阻塞，下一次很可能已被他人回填
+                        // 抢不到锁就快速返回，不在热点场景里阻塞业务线程。
                         return null;
                     }
-                    // Double-Check
+                    // 双重检查，避免等拿到锁时别人已经写好了缓存。
                     json = redis.opsForValue().get(key);
                     if (json != null) {
                         LogicalValue<T> wrap = mapper.readValue(json,
                                 mapper.getTypeFactory().constructParametricType(LogicalValue.class, type));
                         return wrap.getData();
                     }
-                    // DB 装填
+                    // 确认缓存仍为空后，才真正回源数据库。
                     T db = dbLoader.apply(id);
                     if (db == null) {
-                        writeLogical(key, null, RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES); // 负缓存（防穿透）
+                        // 对不存在的数据写一个短 TTL 的空值包装，防止持续穿透数据库。
+                        writeLogical(key, null, RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
                         return null;
                     }
                     writeLogical(key, db, logicTtl, unit);
@@ -88,16 +93,16 @@ public class CacheClient {
                 }
             }
 
-            // 命中：判断逻辑过期
+            // 命中缓存后，通过 expireAt 判断逻辑是否过期，而不是依赖 Redis 物理 TTL。
             LogicalValue<T> wrap = mapper.readValue(json,
                     mapper.getTypeFactory().constructParametricType(LogicalValue.class, type));
             long now = System.currentTimeMillis();
             if (wrap.getExpireAt() > now) {
-                // 未过期，直接返回
+                // 逻辑上仍有效，直接返回。
                 return wrap.getData();
             }
 
-            // 已过期：返回旧值 + 异步刷新
+            // 过期后优先返回旧值保证可用性，再异步刷新缓存。
             final String snapshot = json;
             final String lockKey = lockPrefix + id;
 
@@ -105,28 +110,32 @@ public class CacheClient {
                 RLock lock = redisson.getLock(lockKey);
                 boolean locked = false;
                 try {
-                    locked = lock.tryLock(0, TimeUnit.SECONDS); // 不等待，最多持有10s
+                    // 不等待锁，抢到才刷新，避免多个线程同时回源数据库。
+                    locked = lock.tryLock(0, TimeUnit.SECONDS);
                     if (!locked) return;
 
                     String latest = redis.opsForValue().get(key);
-                    if (!Objects.equals(snapshot, latest)) return; // 已被别人刷新
+                    if (!Objects.equals(snapshot, latest)) return; // 已经被别的线程刷新过了
 
                     T fresh = dbLoader.apply(id);
-                    writeLogical(key, fresh, logicTtl, unit); // fresh==null 时写负缓存
+                    writeLogical(key, fresh, logicTtl, unit); // fresh==null 时会写入空值包装
                 } catch (Exception e) {
                     log.warn("async refresh error, key={}", key, e);
                 } finally {
                     if (locked && lock.isHeldByCurrentThread()) lock.unlock();
                 }
             });
-            // 先返回旧值，保证可用性
+            // 最终优先把旧值返回给调用方，避免缓存刷新拖慢用户请求。
             return wrap.getData();
         } catch (Exception e) {
             throw new RuntimeException("getLogical error, key=" + key, e);
         }
     }
 
-    /** 写：事务提交后“刷新缓存”（不是删），避免旧值回填 */
+    /**
+     * 在事务提交后刷新缓存。
+     * 这里选择直接回写新值，而不是简单删除缓存，目的是减少热点 key 的冷启动成本。
+     */
     public <T> void refreshAfterCommit(String fullKey, Supplier<T> loader, long logicTtl, TimeUnit unit) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             writeNow(fullKey, loader, logicTtl, unit);
@@ -156,11 +165,11 @@ public class CacheClient {
         LogicalValue<T> v = new LogicalValue<>();
         v.setData(data);
         v.setExpireAt(Instant.now().plusMillis(unit.toMillis(ttl)).toEpochMilli());
-        // 物理 TTL 可不设或设很长；逻辑过期由 expireAt 控制
+        // 物理 TTL 不参与本方案的“是否可用”判断，expireAt 才是真正的逻辑过期时间。
         redis.opsForValue().set(key, mapper.writeValueAsString(v));
     }
 
-    /** 逻辑过期包装结构 */
+    /** 逻辑过期包装结构：真正的数据和逻辑过期时间一起保存。 */
     public static class LogicalValue<T> {
         private T data;
         private long expireAt;

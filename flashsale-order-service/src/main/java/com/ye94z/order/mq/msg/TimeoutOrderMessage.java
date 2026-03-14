@@ -7,8 +7,12 @@ import lombok.experimental.Accessors;
 @Data
 @Accessors(chain = true)
 public class TimeoutOrderMessage {
+    /** 订单 ID。 */
     private Long orderId;
+    /** 商品 ID。 */
     private Long productId;
+    /** 预占库存数量。 */
     private Integer quantity;
+    /** 用户 ID。 */
     private Long userId;
 }

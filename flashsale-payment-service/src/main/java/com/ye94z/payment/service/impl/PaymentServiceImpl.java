@@ -25,14 +25,22 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
+    /** 钱包账户表访问层。 */
     private final WalletAccountMapper accountMapper;
+    /** 支付流水表访问层。 */
     private final WalletTxnMapper txnMapper;
+    /** 支付成功事件发布器。 */
     private final PaymentEventProducer producer;
+    /** 预留 Redis 能力，当前主链路中未直接使用。 */
     private final StringRedisTemplate redisTemplate;
 
+    /** 流水方向：扣款。 */
     private static final int DIR_DEBIT = 1;
+    /** 流水状态：成功。 */
     private static final int ST_SUCCESS = 2;
+    /** 业务类型：订单支付。 */
     private static final int BIZ_PAY_ORDER = 1;
+    /** 支付渠道：余额。 */
     private static final int CH_BALANCE = 1;
 
     @Transactional(rollbackFor = Exception.class)
@@ -42,31 +50,32 @@ public class PaymentServiceImpl implements PaymentService {
             return Result.fail("参数错误");
         }
 
-        // 幂等：若已存在该订单的成功流水，直接返回
+        // 1) 先做幂等检查，避免同一订单重复扣款。
         WalletTxn exists = txnMapper.findByOrderId(orderId);
         if (exists != null && exists.getStatus() != null && exists.getStatus() == ST_SUCCESS) {
             return Result.fail("paid, txnId = " + exists.getId());
         }
 
-        // 扣减余额（乐观锁重试）
+        // 2) 查询钱包账户并检查余额。
         WalletAccount acc = accountMapper.findByUserId(userId);
         if (acc == null) return Result.fail("钱包不存在");
         if (acc.getBalanceCents() == null || acc.getBalanceCents() < amountCents) {
             return Result.fail("余额不足");
         }
 
+        // 3) 使用乐观锁扣减余额，遇到版本冲突时做有限次重试。
         int retry = 3;
         boolean deducted = false;
         while (retry-- > 0) {
             int n = accountMapper.deductBalance(userId, amountCents, acc.getVersion());
             if (n > 0) { deducted = true; break; }
-            // 版本冲突，重读+重试
+            // 版本冲突后重新读取账户快照，再决定是否继续尝试。
             acc = accountMapper.findByUserId(userId);
             if (acc == null || acc.getBalanceCents() < amountCents) return Result.fail("余额不足");
         }
         if (!deducted) return Result.fail("支付繁忙，请重试");
 
-        // 记成功流水
+        // 4) 扣款成功后记录支付流水，后续订单状态回写依赖这条记录。
         WalletTxn txn = new WalletTxn()
                 .setUserId(userId)
                 .setOrderId(orderId)
@@ -80,13 +89,13 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             txnMapper.insert(txn); // 唯一键: order_id
         } catch (DuplicateKeyException dup) {
-            // 幂等：已经有这笔订单的流水
+            // 并发插入时由数据库唯一键帮助收敛幂等结果。
             WalletTxn existed = txnMapper.findByOrderId(orderId);
             if (existed != null && existed.getStatus() == ST_SUCCESS) {
-                // 不再发布事件（很可能已发布过）；直接返回成功与原txnId
+                // 成功流水已经存在时，不再重复发布支付成功事件。
                 return Result.ok(existed.getId());
             }
-            // 如果查到是 INIT/FAILED 等中间态，你可以返回“处理中/失败”，由上层决定是否重试
+            // 其他中间态先统一视为处理中。
             return Result.fail("支付处理中或已被处理，请稍后查询状态");
         }
 
@@ -98,7 +107,7 @@ public class PaymentServiceImpl implements PaymentService {
         evt.setTxnId(txnId);
         evt.setPaidAt(LocalDateTime.now());
 
-        // 事务提交后发布事件，避免“扣款回滚但发了消息”
+        // 5) 事务提交后再发支付成功事件，避免“扣款回滚但事件已发出”的不一致。
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() { producer.publishPaid(evt); }

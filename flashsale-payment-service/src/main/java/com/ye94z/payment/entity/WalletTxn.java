@@ -3,17 +3,29 @@ package com.ye94z.payment.entity;
 import java.time.LocalDateTime;
 
 public class WalletTxn {
+    /** 主键 ID。 */
     private Long id;
+    /** 用户 ID。 */
     private Long userId;
+    /** 业务关联订单 ID。 */
     private Long orderId;
+    /** 交易金额，单位分。 */
     private Long amountCents;
-    private Integer direction; // 1=DEBIT,2=CREDIT
-    private Integer status;    // 1=INIT,2=SUCCESS,3=FAILED
-    private Integer bizType;   // 1=PAY_ORDER
-    private Integer channel;   // 1=BALANCE
+    /** 交易方向：1=DEBIT,2=CREDIT。 */
+    private Integer direction;
+    /** 流水状态：1=INIT,2=SUCCESS,3=FAILED。 */
+    private Integer status;
+    /** 业务类型：当前主要是 PAY_ORDER。 */
+    private Integer bizType;
+    /** 支付渠道：当前主要是 BALANCE。 */
+    private Integer channel;
+    /** 预留的幂等键字段。 */
     private String idempotencyKey;
+    /** 审计与排障备注。 */
     private String remark;
+    /** 创建时间。 */
     private LocalDateTime createTime;
+    /** 更新时间。 */
     private LocalDateTime updateTime;
 
     public Long getId() { return id; }

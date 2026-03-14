@@ -9,10 +9,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 对外（含 Feign）暴露的商品接口：
- * - POST /api/products/gate-purchase?productId=&userId=&quantity=
- * - GET  /api/products/{id}
- * - POST /api/products/stock/restore?productId=&quantity=
+ * 商品服务对外接口。
+ * 既供前端访问，也供 order-service 通过 Feign 做内部调用。
  */
 @Slf4j
 @RestController
@@ -23,9 +21,7 @@ public class ProductController {
 
     private final ProductService productService;
 
-    /**
-     * 闸口校验（Lua 原子：库存、每人限购累计、原子扣减）
-     */
+    /** 秒杀闸口：做活动校验、限购校验并原子预扣 Redis 库存。 */
     @PostMapping("/gate-purchase")
     public Result<Long> gatePurchase(@RequestParam("productId") Long productId,
                                      @RequestParam("userId") Long userId,
@@ -34,27 +30,25 @@ public class ProductController {
         return productService.gatePurchase(productId, userId, quantity);
     }
 
-    /**
-     * 商品详情（用于确认价格等关键字段）
-     */
+    /** 查询商品详情，供页面展示和订单服务确认价格使用。 */
     @GetMapping("/{id}")
     public Result<ProductDTO> getProduct(@PathVariable("id") Long id) {
         return productService.getProduct(id);
     }
 
-    /**
-     * 上架秒杀商品（包含 redis 库存预热）
-     */
+    /** 商品上架，并把库存预热到 Redis。 */
     @PostMapping("/{id}/on-sale")
     public Result<Void> onSale(@PathVariable("id") Long id){
         return productService.onSale(id);
     }
 
+    /** 更新商品，更新成功后会刷新商品缓存。 */
     @PostMapping("/update")
     public Result update(@RequestBody ProductDTO productDTO) {
         return productService.update(productDTO);
     }
 
+    /** 回补库存，通常由取消订单或超时关单触发。 */
     @PostMapping("/stock/restoreStock")
     public Result restoreStock(@RequestParam("productId") Long productId,
                                @RequestParam("userId") Long userId,

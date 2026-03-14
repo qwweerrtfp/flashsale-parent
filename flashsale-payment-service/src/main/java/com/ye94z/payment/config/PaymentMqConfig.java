@@ -14,7 +14,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 支付事件交换机（仅发布端需要交换机；队列由 order-service 声明绑定）
+ * 支付服务的 MQ 配置。
+ * 当前职责主要是声明支付事件交换机，并统一消息的序列化和发送策略。
  */
 @Configuration
 @Slf4j
@@ -27,14 +28,14 @@ public class PaymentMqConfig {
         return ExchangeBuilder.topicExchange(EX_PAYMENT_EVENTS).durable(true).build();
     }
 
-    /** 1) 使用你全局的 ObjectMapper：Long→String、日期格式等策略会生效 */
+    /** 使用统一 JSON 转换器，保证事件消息结构稳定。 */
     @Bean
     public MessageConverter messageConverter(ObjectMapper objectMapper) {
         // 如需跨服务反序列化外部包模型，可放开受信包（生产建议精确到前缀）
         return new Jackson2JsonMessageConverter(objectMapper);
     }
 
-    /** 2) RabbitTemplate 走同一个 JSON Converter，并开启 Confirm/Return 便于排障 */
+    /** RabbitTemplate 打开 Confirm/Return，方便排查事件是否真正送达交换机。 */
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory cf, MessageConverter mc) {
         RabbitTemplate t = new RabbitTemplate(cf);
@@ -58,7 +59,7 @@ public class PaymentMqConfig {
         return t;
     }
 
-    /** 3) 监听容器也用同一个 JSON Converter（关键！） */
+    /** 预留监听容器配置，即使当前没有消费者也保持序列化策略统一。 */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,

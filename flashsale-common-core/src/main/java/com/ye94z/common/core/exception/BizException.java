@@ -1,11 +1,13 @@
 package com.ye94z.common.core.exception;
 
 /**
- * 业务异常：运行时异常，支持错误码 + 自定义消息
- * 建议在 Service 层直接抛出，由各服务的全局异常处理器统一转换为 Result
+ * 业务异常基类。
+ * 运行时异常可以避免在 Service 层四处显式 throws，
+ * 同时又能保留独立的业务错误码，方便网关或控制器统一转成标准响应。
  */
 public class BizException extends RuntimeException {
 
+    /** 面向前端或上层调用方的业务错误码。 */
     private final int code;
 
     public BizException(ErrorCode errorCode) {

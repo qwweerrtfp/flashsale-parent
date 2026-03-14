@@ -18,14 +18,15 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
- * 统一重试：所有主队列失败 -> DLX -> 各自重试队列(5s TTL) -> 回到原交换机/原路由键
- * 重试次数>=2 后由消费者转发到统一 DLT。
+ * 订单侧 MQ 基础设施配置。
+ * 采用统一的“主队列 -> 全局 DLX -> 重试队列 -> 回原队列”模型，
+ * 让取消、支付、超时关单三类消息共享同一套失败治理方式。
  */
 @Configuration
 @Slf4j
 public class OrderMqConfig {
 
-    /* === 你已有的定义，保持不变 === */
+    /* === 订单命令与延时命令的交换机/路由键/队列定义 === */
     public static final String EX_ORDER_CMD    = "order.cmd.ex";
     public static final String EX_ORDER_DELAY  = "order.delay.ex";
 
@@ -49,7 +50,7 @@ public class OrderMqConfig {
         return new CustomExchange(EX_ORDER_DELAY, "x-delayed-message", true, false, args);
     }
 
-    /* === 统一 DLX & DLT（新增） === */
+    /* === 统一死信交换机与最终失败队列 === */
     public static final String EX_GLOBAL_DLX = "order.dlx.ex";  // 全局死信交换机
     public static final String Q_GLOBAL_DLT  = "order.q.dlt";   // 统一最终失败队列
     public static final String RK_RETRY      = "retry";         // DLX -> 各重试队列
@@ -70,7 +71,7 @@ public class OrderMqConfig {
         return BindingBuilder.bind(globalDltQueue).to(globalDlx).with(RK_DLT);
     }
 
-    /* === 工具：给主队列套上 DLX，返回主队列实例 === */
+    /* === 工具：为主队列挂上统一 DLX === */
     private Queue mainQueueWithDlx(String queueName) {
         Map<String, Object> args = new HashMap<>();
         args.put("x-dead-letter-exchange", EX_GLOBAL_DLX);
@@ -78,7 +79,7 @@ public class OrderMqConfig {
         return QueueBuilder.durable(queueName).withArguments(args).build();
     }
 
-    /* === 工具：为某主路由创建“重试队列”，TTL到期后回原交换机/原路由键 === */
+    /* === 工具：创建重试队列，TTL 到期后回原交换机/原路由键 === */
     private Queue retryQueue(String retryQueueName, String deadLetterExchangeBack, String deadLetterRoutingKeyBack, int ttlMs) {
         Map<String, Object> args = new HashMap<>();
         args.put("x-message-ttl", ttlMs);
@@ -126,14 +127,14 @@ public class OrderMqConfig {
         return BindingBuilder.bind(qOrderTimeoutRetry).to(globalDlx).with(RK_RETRY);
     }
 
-    /** 1) 使用你全局的 ObjectMapper：Long→String、日期格式等策略会生效 */
+    /** 使用统一 JSON 转换器，保证消息结构和 HTTP 层尽量一致。 */
     @Bean
     public MessageConverter messageConverter(ObjectMapper objectMapper) {
         // 如需跨服务反序列化外部包模型，可放开受信包（生产建议精确到前缀）
         return new Jackson2JsonMessageConverter(objectMapper);
     }
 
-    /** 2) RabbitTemplate 走同一个 JSON Converter，并开启 Confirm/Return 便于排障 */
+    /** 普通命令消息模板，打开 Confirm/Return 方便排障。 */
     @Bean
     @Primary
     public RabbitTemplate rabbitTemplate(ConnectionFactory cf, MessageConverter mc) {
@@ -160,6 +161,7 @@ public class OrderMqConfig {
 
     @Bean("delayTemplate")
     public RabbitTemplate delayTemplate(ConnectionFactory cf, MessageConverter mc) {
+        // 专门给延时交换机使用的模板。
         var t = new RabbitTemplate(cf); t.setMessageConverter(mc);
         t.setMandatory(false); // 直接禁用
         t.setConfirmCallback((corr, ack, cause) -> {
@@ -173,7 +175,7 @@ public class OrderMqConfig {
         return t;
     }
 
-    /** 3) 监听容器也用同一个 JSON Converter（关键！） */
+    /** 监听容器统一走 JSON Converter，并显式使用手动 ACK。 */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,
@@ -182,12 +184,12 @@ public class OrderMqConfig {
         SimpleRabbitListenerContainerFactory f = new SimpleRabbitListenerContainerFactory();
         configurer.configure(f, cf);
         f.setMessageConverter(mc);
-        // 关键：并发与预取（不做批量）
+        // 显式配置并发与预取，便于压测或排查堆积时调整。
         f.setConcurrentConsumers(4);       // 初始并发消费者数（每队列每实例）
         f.setMaxConcurrentConsumers(8);    // 峰值自动扩到 8
         f.setPrefetchCount(300);           // 每个消费者一次性抓 300 条放在本地缓冲
 
-        // 你现在消费者里用 basicAck/basicReject，所以必须 MANUAL
+        // 消费者自己调用 basicAck/basicReject，因此这里必须是 MANUAL。
         f.setAcknowledgeMode(AcknowledgeMode.MANUAL);
 
         // 可选：每个消费者的线程名，便于日志排查

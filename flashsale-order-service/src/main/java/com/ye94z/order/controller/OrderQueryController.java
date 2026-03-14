@@ -9,7 +9,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 查询接口：单据详情/我的订单列表
+ * 订单查询接口。
+ * 当前入口已经预留，但 Service 层查询实现尚未完成。
  */
 @RestController
 @RequestMapping(value = "/api/orders", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -22,6 +23,7 @@ public class OrderQueryController {
         this.orderService = orderService;
     }
 
+    /** 查询订单详情。 */
     @GetMapping("/{orderId}")
     public Result detail(@RequestHeader("X-User-Id") Long userId,
                          @PathVariable("orderId") @NotNull @Min(1) Long orderId) {

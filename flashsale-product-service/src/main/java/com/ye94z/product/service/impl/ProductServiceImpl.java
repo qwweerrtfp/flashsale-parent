@@ -33,15 +33,18 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class ProductServiceImpl implements ProductService {
 
+    /** 商品表访问层。 */
     private final FlashProductMapper productMapper;
+    /** Redis 主要承载库存、限购累计和缓存。 */
     private final StringRedisTemplate stringRedisTemplate;
+    /** 统一的逻辑过期缓存组件。 */
     private final CacheClient cacheClient;
 
-    /** 逻辑缓存前缀与锁前缀（与 CacheClient 配合） */
+    /** 逻辑缓存 key 前缀与互斥锁前缀。 */
     private static final String CACHE_PRODUCT_KEY = RedisConstants.CACHE_PRODUCT_KEY; // "cache:product:"
     private static final String LOCK_PRODUCT_KEY  = RedisConstants.LOCK_PRODUCT_KEY;  // "lock:product:"
 
-    /** 从类路径加载 Lua（ARGV: productId, userId, qty, limitPerUser） */
+    /** 从类路径加载 Lua 脚本，把高并发下的原子逻辑放到 Redis 侧执行。 */
     private static final DefaultRedisScript<Long> FLASH_GATE_SCRIPT;
     private static final DefaultRedisScript<Long> RESTORE_STOCK_SCRIPT;
     static {
@@ -60,7 +63,7 @@ public class ProductServiceImpl implements ProductService {
     public Result<ProductDTO> getProduct(Long id) {
         if (id == null || id <= 0) return Result.fail("参数错误：id 非法");
 
-        // 逻辑过期缓存：热点基本 0 次 DB 读；冷启动或缓存失效时由 CacheClient 回源一次 DB 并回写
+        // 热点商品优先走逻辑过期缓存，减少高并发下数据库被打穿的概率。
         FlashProduct p = cacheClient.getLogical(
                 CACHE_PRODUCT_KEY, LOCK_PRODUCT_KEY,
                 id,
@@ -70,6 +73,7 @@ public class ProductServiceImpl implements ProductService {
         );
         if (p == null) return Result.fail("商品不存在");
 
+        // 显式转换为 DTO，避免把数据库实体直接暴露到服务边界之外。
         ProductDTO dto = new ProductDTO();
         dto.setId(p.getId());
         dto.setInitStock(p.getStock());
@@ -83,14 +87,14 @@ public class ProductServiceImpl implements ProductService {
         return Result.ok(dto);
     }
 
-    // -------------------- 下单闸口（热点0DB） --------------------
+    // -------------------- 下单闸口（热点路径尽量不触库） --------------------
 
     @Override
     public Result<Long> gatePurchase(Long productId, Long userId, Integer quantity) {
         if (productId == null || userId == null) return Result.fail("参数错误");
         final int qty = (quantity == null || quantity <= 0) ? 1 : quantity;
 
-        // 1) 用缓存快照做业务校验（状态/时间/限购），避免热读打DB
+        // 1) 先基于商品快照做“是否允许购买”的业务判断。
         FlashProduct p = cacheClient.getLogical(
                 CACHE_PRODUCT_KEY, LOCK_PRODUCT_KEY,
                 productId,
@@ -107,7 +111,7 @@ public class ProductServiceImpl implements ProductService {
 
         final int limit = (p.getLimitPerUser() == null || p.getLimitPerUser() <= 0) ? 1 : p.getLimitPerUser();
 
-        // 2) 执行 Lua：库存 >= qty && (累计+qty) <= limit -> 原子扣库存 & 累计
+        // 2) 再执行 Lua，原子完成库存校验、限购校验和库存预扣。
         String stockKey = RedisConstants.STOCK_PREFIX + "{" + productId + "}";
         String buyKey = RedisConstants.USER_BUY_HASH + "{" + productId + "}";
         Long ret = stringRedisTemplate.execute(
@@ -119,6 +123,7 @@ public class ProductServiceImpl implements ProductService {
         );
         int code = (ret == null) ? -1 : ret.intValue();
 
+        // 成功时返回秒杀价，让订单服务按同一份快照计算订单金额。
         if (code == 0) return Result.ok(p.getFlashPriceCents());
 
         return switch (code) {
@@ -136,6 +141,7 @@ public class ProductServiceImpl implements ProductService {
         }
         int i = productMapper.update(productDTO);
         if(i == 0) return Result.fail("更新失败");
+        // 事务提交后刷新缓存，避免出现旧值回填窗口。
         cacheClient.refreshAfterCommit(
                 CACHE_PRODUCT_KEY + productDTO.getId(),
                 () -> productMapper.findById(productDTO.getId()),
@@ -148,6 +154,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Result<Void> onSale(Long id) {
         if(id == null || id <= 0) return Result.fail("参数错误");
+        // 先读取商品，确认它存在并拿到当前库存。
         Result<ProductDTO> productDTOResult = getProduct(id);
         if(!productDTOResult.isSuccess() || productDTOResult.getData() == null){
             return Result.fail("商品不存在");
@@ -159,6 +166,7 @@ public class ProductServiceImpl implements ProductService {
         p.setId(id);
         p.setStatus(2);
 
+        // 先更新数据库状态为 ONLINE，再在提交后处理 Redis 预热。
         Result<Void> update = update(p);
         if(!update.isSuccess()) return Result.fail("上架失败");
 
@@ -166,6 +174,7 @@ public class ProductServiceImpl implements ProductService {
             @Override
             public void afterCommit() {
                 try {
+                    // setIfAbsent 避免误覆盖已有库存快照。
                     stringRedisTemplate.opsForValue().setIfAbsent(RedisConstants.STOCK_PREFIX + "{" + id + "}", String.valueOf(stock));
                     cacheClient.refreshAfterCommit(
                             CACHE_PRODUCT_KEY + id,
@@ -182,6 +191,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Result restoreStock(Long productId, Long userId, Integer quantity) {
+        // 库存恢复同样走 Lua，保证“加库存”和“减累计购买数”同时成功或同时失败。
         String stockKey = RedisConstants.STOCK_PREFIX + "{" + productId + "}";
         String buyKey = RedisConstants.USER_BUY_HASH + "{" + productId + "}";
         Long ret = stringRedisTemplate.execute(RESTORE_STOCK_SCRIPT,

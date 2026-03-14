@@ -5,27 +5,23 @@ import com.ye94z.order.entity.CreateOrderRequest;
 import com.ye94z.order.mq.msg.CancelOrderMessage;
 
 /**
- * 订单领域服务（命令+查询）
- * - placeOrderAsync：异步下单，快速返回 orderId
- * - requestCancel  ：用户主动取消（仅 UNPAID -> CANCELED）
- * - requestPay     ：发起支付（由 payment-service 处理，成功后异步回调）
- * - getDetail      ：订单详情
- * - listMyOrders  ：我的订单分页
+ * 订单领域服务。
+ * 命令侧负责串联商品、支付和 MQ；查询侧统一收口，便于后续扩展。
  */
 public interface OrderService {
 
-    /** 下单 */
+    /** 下单，成功时返回新生成的 orderId。 */
     Result requestOrder(Long userId, CreateOrderRequest req);
 
-    /** 用户主动取消（仅未支付可取消） */
+    /** 用户主动取消，仅未支付订单允许成功。 */
     Result requestCancel(Long userId, CancelOrderMessage msg);
 
-    /** 发起支付（余额渠道），实际扣款由 payment-service 完成 */
+    /** 发起支付命令。 */
     Result requestPay(Long userId, Long orderId);
 
-    /** 订单详情（含基本鉴权） */
+    /** 查询订单详情。 */
     Result getDetail(Long userId, Long orderId);
 
-    /** 我的订单分页（可选 status 过滤） */
+    /** 查询我的订单列表。 */
     Result listMyOrders(Long userId, Integer page, Integer size, Integer status);
 }

@@ -1,11 +1,9 @@
 package com.ye94z.common.core.exception;
 
 /**
- * 统一错误码枚举
- * 2xx: 成功
- * 4xx: 客户端错误
- * 5xx: 服务端错误
- * 1xxx: 业务语义错误
+ * 统一错误码枚举。
+ * 这里既保留 HTTP 常见错误码语义，也预留 1xxx 的业务错误码，
+ * 方便“接口层错误”和“领域层错误”使用同一套枚举表达。
  */
 public enum ErrorCode {
 

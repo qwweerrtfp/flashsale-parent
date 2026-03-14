@@ -3,14 +3,16 @@ package com.ye94z.common.core.utils;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 简单随机工具
+ * 一些轻量随机字符串工具。
+ * 当前主要服务于验证码生成和默认昵称后缀生成。
  */
 public final class MyUtils {
 
     private MyUtils(){}
 
-    /** 数字+大小写字母 */
+    /** 数字 + 大小写字母字符集。 */
     public static final String ALL_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    /** 纯数字字符集。 */
     public static final String NUM_CHARS = "0123456789";
 
     /** 生成指定长度的纯数字随机串 */

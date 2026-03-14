@@ -1,15 +1,19 @@
 server:
+  # 网关统一入口端口。
   port: 9000
 
 spring:
   application:
+    # 网关在注册中心中的服务名。
     name: flashsale-gateway-service
   cloud:
     nacos:
       discovery:
+        # 通过 Nacos 发现各个后端服务实例。
         server-addr: 127.0.0.1:8848
     gateway:
       default-filters:
+        # 去重 CORS 响应头，避免下游和网关重复写入时浏览器报错。
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       globalcors:
         add-to-simple-url-handler-mapping: true
@@ -20,6 +24,7 @@ spring:
             allowedHeaders: "*"
             allowCredentials: false
       routes:
+        # 用户相关接口统一转发到 user-service。
         - id: user
           uri: lb://flashsale-user-service
           predicates:
@@ -27,6 +32,7 @@ spring:
           filters:
             - StripPrefix=1
 
+        # 商品相关接口统一转发到 product-service。
         - id: product
           uri: lb://flashsale-product-service
           predicates:
@@ -34,6 +40,7 @@ spring:
           filters:
             - StripPrefix=1
 
+        # 订单相关接口统一转发到 order-service。
         - id: order
           uri: lb://flashsale-order-service
           predicates:
@@ -41,6 +48,7 @@ spring:
           filters:
             - StripPrefix=1
 
+        # 支付接口统一转发到 payment-service。
         - id: payment
           uri: lb://flashsale-payment-service
           predicates:

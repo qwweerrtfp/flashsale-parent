@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 简化 Redisson 配置（单机）
- * 可在 application.yaml 配置 spring.data.redis.{host,port,password}
+ * 订单服务的 Redisson 配置。
+ * 当前主链路里用得不多，但为后续分布式互斥、幂等控制等场景预留了能力。
  */
 @Configuration
 public class RedissonConfig {

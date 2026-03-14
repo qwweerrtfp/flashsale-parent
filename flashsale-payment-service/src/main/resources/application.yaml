@@ -1,10 +1,13 @@
 server:
+  # 支付服务端口。
   port: 9040
 
 spring:
   application:
+    # Nacos 中的服务名。
     name: flashsale-payment-service
   datasource:
+    # 支付库连接配置。
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/fs_payment?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
@@ -12,15 +15,19 @@ spring:
   cloud:
     nacos:
       discovery:
+        # 供订单服务通过服务发现调用。
         server-addr: 127.0.0.1:8848
   jackson:
+    # 支付服务统一使用上海时区。
     time-zone: Asia/Shanghai
   data:
     redis:
+      # 预留 Redis 能力，当前支付主链路以数据库事务为主。
       host: 127.0.0.1
       port: 6379
 
 mybatis:
+  # MyBatis XML 与实体别名配置。
   mapper-locations: classpath*:mapper/**/*.xml
   type-aliases-package: com.worthy.payment.entity
   configuration:
@@ -28,4 +35,5 @@ mybatis:
 
 logging:
   level:
+    # 支付服务默认打印 info，方便观察支付流水。
     com.worthy.payment: info

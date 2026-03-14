@@ -22,7 +22,10 @@
         <result column="update_time"        property="updateTime"/>
     </resultMap>
 
-    <!-- 新增 -->
+    <!--
+      新增订单。
+      当前 insert 会把订单主数据一次性写入，状态一般为 UNPAID。
+    -->
     <insert id="insert" parameterType="com.ye94z.order.entity.FlashOrder">
         INSERT INTO flash_order
         (id, user_id, product_id, quantity, pay_amount_cents, status, pay_channel, pay_txn_id,
@@ -40,7 +43,11 @@
         WHERE id = #{id}
     </select>
 
-    <!-- 基于旧状态更新为新状态，并写入对应业务时间（2=PAID, 3=FULFILLED, 4=CANCELED） -->
+    <!--
+      基于旧状态做 CAS 式更新。
+      只有当前 status = from 时才更新成功，因此可以避免重复消费导致的状态回退。
+      同时根据目标状态写入不同的业务时间字段。
+    -->
     <update id="updateStatusIf">
         UPDATE flash_order
         <set>
@@ -59,6 +66,10 @@
         WHERE id = #{orderId}
         AND status = #{from}
     </update>
+    <!--
+      支付成功回写。
+      只允许未支付订单被置为已支付，保证支付事件重复投递时仍然幂等。
+    -->
     <update id="markPaidIfUnpaid">
         update flash_order
         set status = 2,               <!-- PAID -->

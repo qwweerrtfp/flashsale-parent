@@ -15,10 +15,10 @@ public class RedissonConfig {
 
     @Bean
     public RedissonClient redissonClient(){
-        // 配置
+        // 当前主要给缓存重建场景提供分布式锁能力。
         Config config = new Config();
         config.useSingleServer().setAddress("redis://127.0.0.1:6379");
-        // 创建RedissonClient对象
+        // 示例环境直接使用单机 Redis 配置即可。
         return Redisson.create(config);
     }
 }
